@@ -185,6 +185,29 @@ CI/CD / System Design
 * 데이터가 증가했을 때 구조를 어떻게 변경해야 하는가
 * 기능이 커질 때 서비스를 어떤 기준으로 분리해야 하는가
 
+## Commit Convention
+
+커밋 메시지는 Conventional Commits 형식을 사용한다.
+
+- `feat`: 새로운 기능 추가
+- `fix`: 버그 수정
+- `refactor`: 기능 변화 없는 코드 구조 개선
+- `docs`: 문서 수정
+- `test`: 테스트 추가/수정
+- `chore`: 환경 설정, 의존성, 기타 작업
+- `perf`: 성능 개선
+- `ci`: CI/CD 설정 변경
+
+예시:
+
+```text
+feat: add Steam player count collector
+fix: handle Steam API timeout
+refactor: separate Steam API client
+docs: update README
+test: add player count tests
+chore: update dependencies
+
 ## Status
 
 🚧 Work in progress
