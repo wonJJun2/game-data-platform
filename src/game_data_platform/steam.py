@@ -6,7 +6,6 @@ def get_current_players(app_id: int) -> int:
         "https://api.steampowered.com/"
         "ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
     )
-
     response = httpx.get(
         url,
         params={"appid": app_id},

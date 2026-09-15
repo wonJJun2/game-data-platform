@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+app.log
+player_counts.jsonl
