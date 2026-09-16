@@ -19,6 +19,7 @@ logging.basicConfig(
 # httpx가 정상 요청까지 INFO 로그로 출력하는 것을 숨김
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+logger = logging.getLogger(__name__)
 
 def main() -> None:
     games = [
