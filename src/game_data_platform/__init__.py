@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-
+import psycopg
 import httpx
 
 from game_data_platform.steam import get_current_players
@@ -37,20 +37,32 @@ def main() -> None:
             player_count = get_current_players(game["app_id"])
 
             data = {
-                "app_id": game["app_id"],
-                "name": game["name"],
-                "player_count": player_count,
-                "collected_at": datetime.now().astimezone().isoformat(),
-            }
+                    "app_id": game["app_id"],
+                    "name": game["name"],
+                    "player_count": player_count,
+                    "collected_at": datetime.now().astimezone(),
+                }
 
-            save_player_count(data)
+            try:
+                save_player_count(data)
 
-            logging.info(
-                "%s | app_id=%s | player_count=%s",
-                game["name"],
-                game["app_id"],
-                player_count,
-            )
+            except ValueError as exc:
+                logger.error(
+                    "게임 기준정보 오류 - %s (%s): %s",
+                    game["name"],
+                    game["app_id"],
+                    exc,
+                )
+                continue
+
+            except psycopg.Error as exc:
+                logger.error(
+                    "DB 저장 실패 - %s (%s): %s",
+                    game["name"],
+                    game["app_id"],
+                    exc,
+                )
+                continue
 
         except httpx.TimeoutException:
             logging.error(
