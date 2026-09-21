@@ -158,10 +158,10 @@ CI/CD / System Design
 
 * [x] Steam 현재 동접자 조회
 * [x] 여러 게임 동접자 조회
-* [ ] 수집 코드 구조 개선
-* [ ] 예외 처리 및 Logging
-* [ ] PostgreSQL 저장
-* [ ] 동접자 시계열 수집
+* [x] 수집 코드 구조 개선
+* [x] 예외 처리 및 Logging
+* [x] PostgreSQL 저장
+* [x] 동접자 시계열 수집
 * [ ] FastAPI 조회 API
 * [ ] Steam News 수집
 * [ ] 패치노트 감지 및 번역/요약
