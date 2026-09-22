@@ -162,7 +162,7 @@ CI/CD / System Design
 * [x] 예외 처리 및 Logging
 * [x] PostgreSQL 저장
 * [x] 동접자 시계열 수집
-* [ ] FastAPI 조회 API
+* [x] FastAPI 조회 API
 * [ ] Steam News 수집
 * [ ] 패치노트 감지 및 번역/요약
 * [ ] Discord Patch Alert
