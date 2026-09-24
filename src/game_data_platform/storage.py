@@ -2,6 +2,11 @@ from psycopg.rows import dict_row
 
 from game_data_platform.database import get_connection
 
+from sqlalchemy import asc, desc, select
+
+from game_data_platform.database import SessionLocal
+from game_data_platform.models import Game, PlayerCount
+
 def save_player_count(data: dict) -> None:
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -40,72 +45,83 @@ def save_player_count(data: dict) -> None:
             )
 
 def get_games():
-    query = """
-        SELECT
-            game_id,
-            steam_app_id,
-            name,
-            created_at
-        FROM games
-        ORDER BY game_id
-    """
+    statement = (
+        select(Game)
+        .order_by(Game.game_id)
+    )
 
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query)
-            return cursor.fetchall()
+    with SessionLocal() as session:
+        games = session.scalars(statement).all()
+
+        return [
+            {
+                "game_id": game.game_id,
+                "steam_app_id": game.steam_app_id,
+                "name": game.name,
+                "created_at": game.created_at,
+            }
+            for game in games
+        ]
 
 def get_game(game_id: int):
-    query = """
-        SELECT
-            game_id,
-            steam_app_id,
-            name,
-            created_at
-        FROM games
-        WHERE game_id = %s
-    """
+    with SessionLocal() as session:
+        game = session.get(Game, game_id)
 
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query, (game_id,))
-            return cursor.fetchone()
+        if game is None:
+            return None
+
+        return {
+            "game_id": game.game_id,
+            "steam_app_id": game.steam_app_id,
+            "name": game.name,
+            "created_at": game.created_at,
+        }
 
 def get_player_counts(
     game_id: int,
     limit: int = 100,
     order: str = "desc",
 ):
-    order_sql = "DESC" if order == "desc" else "ASC"
+    order_by = (
+        desc(PlayerCount.collected_at)
+        if order == "desc"
+        else asc(PlayerCount.collected_at)
+    )
 
-    query = f"""
-        SELECT
-            player_count,
-            collected_at
-        FROM player_counts
-        WHERE game_id = %s
-        ORDER BY collected_at {order_sql}
-        LIMIT %s
-    """
+    statement = (
+        select(PlayerCount)
+        .where(PlayerCount.game_id == game_id)
+        .order_by(order_by)
+        .limit(limit)
+    )
 
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query, (game_id, limit))
-            return cursor.fetchall()
+    with SessionLocal() as session:
+        player_counts = session.scalars(statement).all()
+
+        return [
+            {
+                "player_count": item.player_count,
+                "collected_at": item.collected_at,
+            }
+            for item in player_counts
+        ]
 
 def get_latest_player_count(game_id: int):
-    query = """
-        SELECT
-            game_id,
-            player_count,
-            collected_at
-        FROM player_counts
-        WHERE game_id = %s
-        ORDER BY collected_at DESC
-        LIMIT 1
-    """
+    statement = (
+        select(PlayerCount)
+        .where(PlayerCount.game_id == game_id)
+        .order_by(desc(PlayerCount.collected_at))
+        .limit(1)
+    )
 
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query, (game_id,))
-            return cursor.fetchone()
+    with SessionLocal() as session:
+        player_count = session.scalars(statement).first()
+
+        if player_count is None:
+            return None
+
+        return {
+            "game_id": player_count.game_id,
+            "player_count": player_count.player_count,
+            "collected_at": player_count.collected_at,
+        }

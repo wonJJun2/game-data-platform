@@ -7,7 +7,6 @@ from game_data_platform.storage import (
     get_player_counts,
 )
 
-
 app = FastAPI()
 
 
