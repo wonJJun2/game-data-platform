@@ -9,7 +9,7 @@ from game_data_platform.storage import (
 
 app = FastAPI()
 
-
+# 기본 호출
 @app.get("/")
 def root():
     return {
