@@ -9,6 +9,7 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -34,6 +35,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    
+  redis:
+    image: redis:7-alpine
+    container_name: game-data-redis
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:
