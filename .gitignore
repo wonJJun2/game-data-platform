@@ -13,3 +13,5 @@ app.log
 player_counts.jsonl
 
 .env
+
+logs/
