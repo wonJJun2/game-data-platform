@@ -7,6 +7,8 @@ from sqlalchemy import asc, desc, select
 from game_data_platform.database import SessionLocal
 from game_data_platform.models import Game, PlayerCount
 
+from psycopg.types.json import Jsonb
+
 def save_player_count(data: dict) -> None:
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -125,3 +127,71 @@ def get_latest_player_count(game_id: int):
             "player_count": player_count.player_count,
             "collected_at": player_count.collected_at,
         }
+
+def save_steam_news(data: dict) -> bool:
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT game_id
+                FROM games
+                WHERE steam_app_id = %s
+                """,
+                (data["app_id"],),
+            )
+
+            row = cursor.fetchone()
+
+            if row is None:
+                raise ValueError(
+                    f"등록되지 않은 Steam app_id입니다: {data['app_id']}"
+                )
+
+            game_id = row[0]
+
+            cursor.execute(
+                """
+                INSERT INTO steam_news (
+                    game_id,
+                    steam_gid,
+                    title,
+                    url,
+                    is_external_url,
+                    author,
+                    contents,
+                    feed_label,
+                    feed_name,
+                    feed_type,
+                    published_at,
+                    tags,
+                    collected_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s
+                )
+                ON CONFLICT (game_id, steam_gid)
+                DO NOTHING
+                RETURNING id
+                """,
+                (
+                    game_id,
+                    data["steam_gid"],
+                    data["title"],
+                    data["url"],
+                    data["is_external_url"],
+                    data.get("author"),
+                    data.get("contents"),
+                    data.get("feed_label"),
+                    data.get("feed_name"),
+                    data.get("feed_type"),
+                    data["published_at"],
+                    Jsonb(data.get("tags", [])),
+                    data["collected_at"],
+                ),
+            )
+
+            inserted = cursor.fetchone()
+
+            return inserted is not None
