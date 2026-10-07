@@ -7,8 +7,10 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -162,3 +164,33 @@ Index(
     SteamNews.game_id,
     SteamNews.published_at.desc(),
 )
+
+class SteamNewsPatchDetection(Base):
+    __tablename__ = "steam_news_patch_detection"
+
+    news_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("steam_news.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    is_patch: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+    )
+
+    detection_reason: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    detector_version: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )

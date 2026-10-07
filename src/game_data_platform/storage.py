@@ -195,3 +195,77 @@ def save_steam_news(data: dict) -> bool:
             inserted = cursor.fetchone()
 
             return inserted is not None
+
+def get_undetected_steam_news(
+    detector_version: str,
+) -> list[dict]:
+    query = """
+        SELECT
+            sn.id,
+            sn.title,
+            sn.contents,
+            sn.tags,
+            sn.feed_name
+        FROM steam_news sn
+        LEFT JOIN steam_news_patch_detection pd
+            ON pd.news_id = sn.id
+        WHERE
+            pd.news_id IS NULL
+            OR pd.detector_version <> %s
+        ORDER BY sn.published_at ASC
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (detector_version,),
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "title": row[1],
+            "contents": row[2],
+            "tags": row[3],
+            "feed_name": row[4],
+        }
+        for row in rows
+    ]
+
+def save_patch_detection(
+    news_id: int,
+    is_patch: bool,
+    detection_reason: str,
+    detector_version: str,
+) -> None:
+    query = """
+        INSERT INTO steam_news_patch_detection (
+            news_id,
+            is_patch,
+            detection_reason,
+            detector_version
+        )
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (news_id)
+        DO UPDATE SET
+            is_patch = EXCLUDED.is_patch,
+            detection_reason = EXCLUDED.detection_reason,
+            detector_version = EXCLUDED.detector_version,
+            detected_at = NOW()
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (
+                    news_id,
+                    is_patch,
+                    detection_reason,
+                    detector_version,
+                ),
+            )
+
+        conn.commit()
