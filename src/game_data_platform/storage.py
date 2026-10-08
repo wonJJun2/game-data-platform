@@ -269,3 +269,261 @@ def save_patch_detection(
             )
 
         conn.commit()
+
+def save_overwatch_patch_note(
+    data: dict,
+) -> bool:
+    query = """
+        INSERT INTO overwatch_patch_notes (
+            source_patch_id,
+            locale,
+            source_date,
+            label_text,
+            title,
+            content_text,
+            content_html,
+            detected_language,
+            source_url
+        )
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s
+        )
+        ON CONFLICT (
+            source_patch_id,
+            locale
+        )
+        DO UPDATE SET
+            source_date = EXCLUDED.source_date,
+            label_text = EXCLUDED.label_text,
+            title = EXCLUDED.title,
+            content_text = EXCLUDED.content_text,
+            content_html = EXCLUDED.content_html,
+            detected_language = EXCLUDED.detected_language,
+            source_url = EXCLUDED.source_url,
+            collected_at = NOW()
+        WHERE
+            overwatch_patch_notes.source_date
+                IS DISTINCT FROM EXCLUDED.source_date
+            OR overwatch_patch_notes.label_text
+                IS DISTINCT FROM EXCLUDED.label_text
+            OR overwatch_patch_notes.title
+                IS DISTINCT FROM EXCLUDED.title
+            OR overwatch_patch_notes.content_text
+                IS DISTINCT FROM EXCLUDED.content_text
+            OR overwatch_patch_notes.content_html
+                IS DISTINCT FROM EXCLUDED.content_html
+            OR overwatch_patch_notes.detected_language
+                IS DISTINCT FROM EXCLUDED.detected_language
+            OR overwatch_patch_notes.source_url
+                IS DISTINCT FROM EXCLUDED.source_url
+        RETURNING id
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (
+                    data["source_patch_id"],
+                    data["locale"],
+                    data["source_date"],
+                    data["label_text"],
+                    data["title"],
+                    data["content_text"],
+                    data["content_html"],
+                    data["detected_language"],
+                    data["source_url"],
+                ),
+            )
+
+            row = cur.fetchone()
+
+        conn.commit()
+
+    return row is not None
+
+def save_game_patch(
+    data: dict,
+) -> bool:
+    query = """
+        INSERT INTO game_patches (
+            game_id,
+            source_provider,
+            source_key,
+            source_locale,
+            source_language,
+            source_date,
+            published_at,
+            title,
+            content_text,
+            source_url
+        )
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s
+        )
+        ON CONFLICT (
+            source_provider,
+            source_key
+        )
+        DO UPDATE SET
+            game_id = EXCLUDED.game_id,
+            source_locale = EXCLUDED.source_locale,
+            source_language = EXCLUDED.source_language,
+            source_date = EXCLUDED.source_date,
+            published_at = EXCLUDED.published_at,
+            title = EXCLUDED.title,
+            content_text = EXCLUDED.content_text,
+            source_url = EXCLUDED.source_url,
+            synced_at = NOW()
+                    WHERE
+            game_patches.game_id
+                IS DISTINCT FROM EXCLUDED.game_id
+            OR game_patches.source_locale
+                IS DISTINCT FROM EXCLUDED.source_locale
+            OR game_patches.source_language
+                IS DISTINCT FROM EXCLUDED.source_language
+            OR game_patches.source_date
+                IS DISTINCT FROM EXCLUDED.source_date
+            OR game_patches.published_at
+                IS DISTINCT FROM EXCLUDED.published_at
+            OR game_patches.title
+                IS DISTINCT FROM EXCLUDED.title
+            OR game_patches.content_text
+                IS DISTINCT FROM EXCLUDED.content_text
+            OR game_patches.source_url
+                IS DISTINCT FROM EXCLUDED.source_url
+        RETURNING id
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (
+                    data["game_id"],
+                    data["source_provider"],
+                    data["source_key"],
+                    data.get("source_locale"),
+                    data["source_language"],
+                    data.get("source_date"),
+                    data.get("published_at"),
+                    data["title"],
+                    data["content_text"],
+                    data["source_url"],
+                ),
+            )
+
+            row = cur.fetchone()
+
+        conn.commit()
+
+    return row is not None
+
+def get_detected_steam_patches() -> list[dict]:
+    query = """
+        SELECT
+            sn.id,
+            sn.game_id,
+            sn.steam_gid,
+            sn.title,
+            sn.contents,
+            sn.url,
+            sn.published_at
+        FROM steam_news sn
+        JOIN steam_news_patch_detection pd
+            ON pd.news_id = sn.id
+        WHERE pd.is_patch = true
+        ORDER BY sn.published_at ASC
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+
+    return [
+        {
+            "news_id": row[0],
+            "game_id": row[1],
+            "steam_gid": row[2],
+            "title": row[3],
+            "contents": row[4],
+            "url": row[5],
+            "published_at": row[6],
+        }
+        for row in rows
+    ]
+
+def get_canonical_overwatch_patches() -> list[dict]:
+    query = """
+        SELECT DISTINCT ON (source_patch_id)
+            source_patch_id,
+            locale,
+            source_date,
+            title,
+            content_text,
+            detected_language,
+            source_url
+        FROM overwatch_patch_notes
+        ORDER BY
+            source_patch_id,
+            CASE
+                WHEN locale = 'ko-KR'
+                     AND detected_language = 'ko'
+                THEN 0
+
+                WHEN locale = 'en-US'
+                THEN 1
+
+                ELSE 2
+            END
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+
+    return [
+        {
+            "source_patch_id": row[0],
+            "locale": row[1],
+            "source_date": row[2],
+            "title": row[3],
+            "content_text": row[4],
+            "detected_language": row[5],
+            "source_url": row[6],
+        }
+        for row in rows
+    ]
+
+def get_game_by_steam_app_id(
+    steam_app_id: int,
+) -> dict | None:
+    query = """
+        SELECT
+            game_id,
+            steam_app_id,
+            name
+        FROM games
+        WHERE steam_app_id = %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (steam_app_id,),
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "game_id": row[0],
+        "steam_app_id": row[1],
+        "name": row[2],
+    }

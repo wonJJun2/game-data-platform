@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
+    "beautifulsoup4>=4.15.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "psycopg[binary]>=3.3.5",
@@ -18,6 +19,7 @@ dependencies = [
 [project.scripts]
 game-data-platform = "game_data_platform:main"
 game-data-news = "game_data_platform.news_pipeline:main"
+game-data-patches = "game_data_platform.patch_pipeline:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

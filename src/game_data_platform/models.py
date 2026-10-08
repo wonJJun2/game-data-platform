@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -193,4 +194,151 @@ class SteamNewsPatchDetection(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+    )
+
+class OverwatchPatchNote(Base):
+    __tablename__ = "overwatch_patch_notes"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    source_patch_id: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    locale: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    label_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    title: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_html: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    detected_language: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_url: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_patch_id",
+            "locale",
+            name="uq_overwatch_patch_source_locale",
+        ),
+    )
+
+class GamePatch(Base):
+    __tablename__ = "game_patches"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    source_provider: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    source_key: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    source_locale: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+    )
+
+    source_language: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    title: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    source_url: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_provider",
+            "source_key",
+            name="uq_game_patches_source",
+        ),
+        Index(
+            "idx_game_patches_game_date",
+            "game_id",
+            "source_date",
+        ),
     )
