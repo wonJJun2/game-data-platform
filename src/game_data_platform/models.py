@@ -342,3 +342,125 @@ class GamePatch(Base):
             "source_date",
         ),
     )
+
+class GamePatchProcessing(Base):
+    __tablename__ = "game_patch_processing"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    patch_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "game_patches.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    target_language: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_content_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
+    translation_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    translated_title: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    translated_content: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    translation_provider: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+
+    translation_model: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    translation_prompt_version: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    translated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    translation_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    summary_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    summary_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    summary: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    summary_provider: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+
+    summary_model: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    summary_prompt_version: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    summarized_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "patch_id",
+            "target_language",
+            name="uq_game_patch_processing_target",
+        ),
+    )
