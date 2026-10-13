@@ -1,6 +1,6 @@
 import re
 
-DETECTOR_VERSION = "v1"
+DETECTOR_VERSION = "v2"
 
 EXCLUDE_TITLE_KEYWORDS = [
     "schedule",
@@ -9,6 +9,7 @@ EXCLUDE_TITLE_KEYWORDS = [
     "anti cheat team",
     "anti-cheat team",
     "store update",
+    "map service report",
 ]
 
 STRONG_TITLE_KEYWORDS = [

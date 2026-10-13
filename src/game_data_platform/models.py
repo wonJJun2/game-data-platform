@@ -264,6 +264,69 @@ class OverwatchPatchNote(Base):
         ),
     )
 
+class PubgPatchNote(Base):
+    __tablename__ = "pubg_patch_notes"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    source_patch_id: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    locale: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    title: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_html: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    detected_language: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    source_url: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_patch_id",
+            "locale",
+            name="uq_pubg_patch_source_locale",
+        ),
+    )
+
 class GamePatch(Base):
     __tablename__ = "game_patches"
 
