@@ -13,10 +13,15 @@ from game_data_platform.storage import (
     get_patch_viewer_list,
 )
 
+from game_data_platform.text_utils import (
+    clean_patch_content,
+)
+
 from game_data_platform.web.presentation import (
     build_patch_blocks,
     build_summary_items,
     format_patch_date,
+    normalize_patch_title,
 )
 
 router = APIRouter()
@@ -87,6 +92,20 @@ def patch_list(
         patch["display_date"] = (
             format_patch_date(
                 patch["source_date"]
+            )
+        )
+
+        patch["display_title"] = (
+            normalize_patch_title(
+                game_name=patch[
+                    "game_name"
+                ],
+                translated_title=patch[
+                    "display_title"
+                ],
+                original_title=patch[
+                    "original_title"
+                ],
             )
         )
 
@@ -223,6 +242,20 @@ def patch_detail(
         )
     )
 
+    patch["display_title"] = (
+        normalize_patch_title(
+            game_name=patch[
+                "game_name"
+            ],
+            translated_title=patch[
+                "display_title"
+            ],
+            original_title=patch[
+                "original_title"
+            ],
+        )
+    )
+
     summary_items = build_summary_items(
         patch["summary"]
     )
@@ -231,8 +264,14 @@ def patch_detail(
         patch["display_content"]
     )
 
+    cleaned_original_content = (
+        clean_patch_content(
+            patch["original_content"]
+        )
+    )
+
     original_blocks = build_patch_blocks(
-        patch["original_content"]
+        cleaned_original_content
     )
 
     return templates.TemplateResponse(

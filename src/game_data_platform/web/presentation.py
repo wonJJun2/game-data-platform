@@ -1,3 +1,5 @@
+import re
+
 def _looks_like_heading(
     line: str,
 ) -> bool:
@@ -140,3 +142,127 @@ def format_patch_date(
     return value.strftime(
         "%Y.%m.%d"
     )
+
+GAME_TITLE_ALIASES = {
+    "Counter-Strike 2": (
+        "Counter-Strike 2",
+        "카운터-스트라이크 2",
+        "CS2",
+    ),
+    "Apex 레전드": (
+        "Apex 레전드",
+        "Apex Legends",
+        "에이펙스 레전드",
+    ),
+    "마블 라이벌즈": (
+        "마블 라이벌즈",
+        "Marvel Rivals",
+    ),
+    "Overwatch": (
+        "Overwatch",
+        "오버워치",
+    ),
+    "PUBG": (
+        "PUBG",
+        "배틀그라운드",
+        "PUBG: BATTLEGROUNDS",
+    ),
+    "Dota 2": (
+        "Dota 2",
+        "도타 2",
+    ),
+    "THE FINALS": (
+        "THE FINALS",
+        "더 파이널스",
+    ),
+    "The First Descendant": (
+        "The First Descendant",
+        "퍼스트 디센던트",
+    ),
+}
+
+
+TITLE_TERM_REPLACEMENTS = (
+    (
+        r"\bPatch Notes\b",
+        "패치 노트",
+    ),
+    (
+        r"\bPatch Note\b",
+        "패치 노트",
+    ),
+    (
+        r"\bVersion\b",
+        "버전",
+    ),
+    (
+        r"\bUpdate\b",
+        "업데이트",
+    ),
+    (
+        r"\bHotfix\b",
+        "핫픽스",
+    ),
+)
+
+
+def normalize_patch_title(
+    game_name: str,
+    translated_title: str | None,
+    original_title: str,
+) -> str:
+    title = (
+        translated_title
+        or original_title
+    ).strip()
+
+    aliases = GAME_TITLE_ALIASES.get(
+        game_name,
+        (game_name,),
+    )
+
+    normalized_title = title
+
+    # 제목 맨 앞의 게임명을
+    # games.name 기준으로 통일
+    for alias in aliases:
+        if not normalized_title.lower().startswith(
+            alias.lower()
+        ):
+            continue
+
+        remainder = normalized_title[
+            len(alias):
+        ].lstrip(
+            " :-–—"
+        )
+
+        if not remainder:
+            normalized_title = game_name
+        else:
+            normalized_title = (
+                f"{game_name} {remainder}"
+            )
+
+        break
+
+    # 패치 제목에서 자주 등장하는
+    # 영문 용어를 한국어로 통일
+    for pattern, replacement in (
+        TITLE_TERM_REPLACEMENTS
+    ):
+        normalized_title = re.sub(
+            pattern,
+            replacement,
+            normalized_title,
+            flags=re.IGNORECASE,
+        )
+
+    # 혹시 치환 과정에서 공백이 중복되면 정리
+    normalized_title = re.sub(
+        r"\s+",
+        " ",
+        normalized_title,
+    ).strip()
+
+    return normalized_title
