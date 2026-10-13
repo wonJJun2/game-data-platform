@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    패치를 찾을 수 없습니다
+{% endblock %}
+
+
+{% block content %}
+
+<section class="not-found">
+
+    <div class="not-found-code">
+        404
+    </div>
+
+    <h1>
+        패치를 찾을 수 없습니다.
+    </h1>
+
+    <p>
+        삭제되었거나 존재하지 않는 패치입니다.
+    </p>
+
+    <a
+        class="not-found-link"
+        href="/patches"
+    >
+        ← 패치 목록으로 돌아가기
+    </a>
+
+</section>
+
+{% endblock %}

@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    {{ patch.display_title }}
+{% endblock %}
+
+
+{% block content %}
+
+<nav class="back-nav">
+    <a href="/patches">
+        ← 패치 목록
+    </a>
+</nav>
+
+
+<article class="detail-page">
+
+    <header class="detail-header">
+
+        <div class="patch-meta">
+            <span class="game-name">
+                {{ patch.game_name }}
+            </span>
+
+            <span class="meta-divider">
+                ·
+            </span>
+
+            <span>
+                {{ patch.display_date }}
+            </span>
+
+            <span class="source-badge">
+                {{ patch.source_provider }}
+            </span>
+        </div>
+
+
+        <h1>
+            {{ patch.display_title }}
+        </h1>
+
+
+        <div class="status-group">
+
+            {% if patch.translation_status == "completed" %}
+                <span class="status-badge">
+                    한국어 번역
+                </span>
+
+            {% elif patch.translation_status == "skipped" %}
+                <span class="status-badge">
+                    한국어 원문
+                </span>
+
+            {% endif %}
+
+            {% if patch.summary_status == "completed" %}
+                <span class="status-badge">
+                    요약 완료
+                </span>
+            {% endif %}
+
+        </div>
+
+    </header>
+
+
+    <section class="summary-panel">
+
+        <div class="section-heading">
+            <span class="section-number">
+                01
+            </span>
+
+            <h2>
+                핵심 요약
+            </h2>
+        </div>
+
+
+        {% if summary_items %}
+
+            <ul class="summary-list">
+
+                {% for item in summary_items %}
+
+                    <li>
+                        {{ item }}
+                    </li>
+
+                {% endfor %}
+
+            </ul>
+
+        {% else %}
+
+            <p class="empty-message">
+                요약 정보가 없습니다.
+            </p>
+
+        {% endif %}
+
+    </section>
+
+
+    <section class="content-section">
+
+        <div class="section-heading">
+            <span class="section-number">
+                02
+            </span>
+
+            <h2>
+                전체 패치노트
+            </h2>
+        </div>
+
+
+        <div class="patch-body">
+
+            {% for block in content_blocks %}
+
+                {% if block.type == "heading" %}
+
+                    <h3 class="content-heading">
+                        {{ block.text }}
+                    </h3>
+
+                {% elif block.type == "list" %}
+
+                    <ul class="content-list">
+
+                        {% for item in block["items"] %}
+
+                            <li>
+                                {{ item }}
+                            </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                {% else %}
+
+                    <p class="content-paragraph">
+                        {{ block.text }}
+                    </p>
+
+                {% endif %}
+
+            {% endfor %}
+
+        </div>
+
+    </section>
+
+
+    <section class="original-section">
+
+        <details>
+
+            <summary>
+                원문 보기
+            </summary>
+
+
+            <div class="original-content">
+
+                <h3>
+                    {{ patch.original_title }}
+                </h3>
+
+                <div class="patch-body original-text">
+
+                    {% for block in original_blocks %}
+
+                        {% if block.type == "heading" %}
+
+                            <h3 class="content-heading">
+                                {{ block.text }}
+                            </h3>
+
+                        {% elif block.type == "list" %}
+
+                            <ul class="content-list">
+
+                                {% for item in block["items"] %}
+
+                                    <li>
+                                        {{ item }}
+                                    </li>
+
+                                {% endfor %}
+
+                            </ul>
+
+                        {% else %}
+
+                            <p class="content-paragraph">
+                                {{ block.text }}
+                            </p>
+
+                        {% endif %}
+
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+        </details>
+
+    </section>
+
+
+    {% if patch.source_url %}
+
+        <div class="source-footer">
+
+            <a
+                class="source-link"
+                href="{{ patch.source_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                공식 패치 페이지 열기
+                ↗
+            </a>
+
+        </div>
+
+    {% endif %}
+
+</article>
+
+{% endblock %}

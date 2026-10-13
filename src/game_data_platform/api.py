@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from fastapi.staticfiles import StaticFiles
+
 from fastapi import FastAPI, HTTPException, Query
 from typing import Literal
 from game_data_platform.storage import (
@@ -7,6 +11,11 @@ from game_data_platform.storage import (
     get_player_counts,
 )
 from game_data_platform.redis_client import redis_client
+
+from game_data_platform.web.routes import (
+    router as web_router,
+)
+
 import json
 from fastapi.encoders import jsonable_encoder
 from redis.exceptions import RedisError
@@ -14,7 +23,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+
 app = FastAPI()
+
+app.mount(
+    "/static",
+    StaticFiles(
+        directory=PACKAGE_DIR / "static",
+    ),
+    name="static",
+)
+
+app.include_router(web_router)
 
 # 기본 호출
 @app.get("/")

@@ -989,3 +989,289 @@ def mark_patch_summary_failed(
             )
 
         conn.commit()
+
+def _build_patch_viewer_filters(
+    game_name: str | None = None,
+    query_text: str | None = None,
+) -> tuple[str, list[str]]:
+    conditions = []
+    params = []
+
+    if game_name:
+        conditions.append(
+            "g.name = %s"
+        )
+        params.append(game_name)
+
+    if query_text:
+        keyword = f"%{query_text}%"
+
+        conditions.append(
+            """
+            (
+                COALESCE(
+                    gpp.translated_title,
+                    gp.title
+                ) ILIKE %s
+
+                OR gp.title ILIKE %s
+
+                OR COALESCE(
+                    gpp.translated_content,
+                    ''
+                ) ILIKE %s
+
+                OR gp.content_text ILIKE %s
+
+                OR COALESCE(
+                    gpp.summary,
+                    ''
+                ) ILIKE %s
+            )
+            """
+        )
+
+        params.extend(
+            [
+                keyword,
+                keyword,
+                keyword,
+                keyword,
+                keyword,
+            ]
+        )
+
+    if not conditions:
+        return "", params
+
+    where_clause = (
+        "WHERE "
+        + " AND ".join(conditions)
+    )
+
+    return where_clause, params
+
+
+def get_patch_viewer_list(
+    limit: int = 10,
+    offset: int = 0,
+    game_name: str | None = None,
+    query_text: str | None = None,
+) -> list[dict]:
+    where_clause, params = (
+        _build_patch_viewer_filters(
+            game_name=game_name,
+            query_text=query_text,
+        )
+    )
+
+    query = f"""
+        SELECT
+            gp.id,
+            g.name,
+
+            COALESCE(
+                gpp.translated_title,
+                gp.title
+            ) AS display_title,
+
+            gp.title AS original_title,
+
+            gp.source_provider,
+            gp.source_language,
+            gp.source_date,
+
+            gpp.summary,
+            gpp.translation_status,
+            gpp.summary_status
+
+        FROM game_patches gp
+
+        JOIN games g
+            ON g.game_id = gp.game_id
+
+        LEFT JOIN game_patch_processing gpp
+            ON gpp.patch_id = gp.id
+            AND gpp.target_language = 'ko'
+
+        {where_clause}
+
+        ORDER BY
+            gp.source_date DESC NULLS LAST,
+            gp.id DESC
+
+        LIMIT %s
+        OFFSET %s
+    """
+
+    query_params = [
+        *params,
+        limit,
+        offset,
+    ]
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                tuple(query_params),
+            )
+
+            rows = cur.fetchall()
+
+    return [
+        {
+            "patch_id": row[0],
+            "game_name": row[1],
+            "display_title": row[2],
+            "original_title": row[3],
+            "source_provider": row[4],
+            "source_language": row[5],
+            "source_date": row[6],
+            "summary": row[7],
+            "translation_status": row[8],
+            "summary_status": row[9],
+        }
+        for row in rows
+    ]
+
+
+def get_patch_viewer_count(
+    game_name: str | None = None,
+    query_text: str | None = None,
+) -> int:
+    where_clause, params = (
+        _build_patch_viewer_filters(
+            game_name=game_name,
+            query_text=query_text,
+        )
+    )
+
+    query = f"""
+        SELECT
+            COUNT(*)
+
+        FROM game_patches gp
+
+        JOIN games g
+            ON g.game_id = gp.game_id
+
+        LEFT JOIN game_patch_processing gpp
+            ON gpp.patch_id = gp.id
+            AND gpp.target_language = 'ko'
+
+        {where_clause}
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                tuple(params),
+            )
+
+            row = cur.fetchone()
+
+    return row[0]
+
+def get_patch_viewer_detail(
+    patch_id: int,
+) -> dict | None:
+    query = """
+        SELECT
+            gp.id,
+            g.name,
+
+            COALESCE(
+                gpp.translated_title,
+                gp.title
+            ) AS display_title,
+
+            gp.title AS original_title,
+
+            COALESCE(
+                gpp.translated_content,
+                gp.content_text
+            ) AS display_content,
+
+            gp.content_text AS original_content,
+
+            gp.source_provider,
+            gp.source_language,
+            gp.source_date,
+            gp.source_url,
+
+            gpp.summary,
+            gpp.translation_status,
+            gpp.summary_status
+
+        FROM game_patches gp
+
+        JOIN games g
+            ON g.game_id = gp.game_id
+
+        LEFT JOIN game_patch_processing gpp
+            ON gpp.patch_id = gp.id
+            AND gpp.target_language = 'ko'
+
+        WHERE gp.id = %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (patch_id,),
+            )
+
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "patch_id": row[0],
+        "game_name": row[1],
+        "display_title": row[2],
+        "original_title": row[3],
+        "display_content": row[4],
+        "original_content": row[5],
+        "source_provider": row[6],
+        "source_language": row[7],
+        "source_date": row[8],
+        "source_url": row[9],
+        "summary": row[10],
+        "translation_status": row[11],
+        "summary_status": row[12],
+    }
+
+def get_patch_viewer_games() -> list[dict]:
+    query = """
+        SELECT
+            g.name,
+            COUNT(gp.id) AS patch_count
+        FROM game_patches gp
+
+        JOIN games g
+            ON g.game_id = gp.game_id
+
+        GROUP BY
+            g.name
+
+        ORDER BY
+            g.name
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+
+            rows = cur.fetchall()
+
+    return [
+        {
+            "name": row[0],
+            "count": row[1],
+        }
+        for row in rows
+    ]

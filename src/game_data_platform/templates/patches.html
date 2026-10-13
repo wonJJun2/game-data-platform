@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    Game Patch Viewer
+{% endblock %}
+
+
+{% block content %}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">
+            PATCH NOTES
+        </p>
+
+        <h1>
+            게임 패치노트
+        </h1>
+
+        <p class="page-description">
+            수집된 공식 패치노트를 한국어 번역과
+            핵심 요약으로 확인합니다.
+        </p>
+    </div>
+
+    <div class="patch-count">
+        {{ total_count }}
+        <span>
+            patches
+        </span>
+    </div>
+
+</section>
+
+<section class="filter-section">
+
+    <form
+        class="filter-form"
+        method="get"
+        action="/patches"
+    >
+
+        <div class="filter-field">
+
+            <label for="game">
+                게임
+            </label>
+
+            <select
+                id="game"
+                name="game"
+            >
+                <option value="">
+                    전체 게임
+                </option>
+
+                {% for game in games %}
+
+                    <option
+                        value="{{ game.name }}"
+                        {% if selected_game == game.name %}
+                            selected
+                        {% endif %}
+                    >
+                        {{ game.name }} ({{ game.count }})
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-field search-field">
+
+            <label for="q">
+                검색
+            </label>
+
+            <input
+                id="q"
+                name="q"
+                type="search"
+                placeholder="패치 제목, 영웅, 무기, 변경 내용 검색"
+                value="{{ search_query or '' }}"
+            >
+
+        </div>
+
+
+        <button
+            class="search-button"
+            type="submit"
+        >
+            검색
+        </button>
+
+
+        {% if selected_game or search_query %}
+
+            <a
+                class="reset-button"
+                href="/patches"
+            >
+                초기화
+            </a>
+
+        {% endif %}
+
+    </form>
+
+
+    {% if selected_game or search_query %}
+
+        <div class="search-result-info">
+
+            <strong>
+                {{ total_count }}
+            </strong>
+
+            개의 패치를 찾았습니다.
+
+            {% if selected_game %}
+                <span>
+                    · {{ selected_game }}
+                </span>
+            {% endif %}
+
+            {% if search_query %}
+                <span>
+                    · "{{ search_query }}"
+                </span>
+            {% endif %}
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+<section class="patch-list">
+    {% if not patches %}
+
+        <div class="no-results">
+
+            <h2>
+                검색 결과가 없습니다.
+            </h2>
+
+            <p>
+                다른 게임이나 검색어로 다시 확인해보세요.
+            </p>
+
+            <a href="/patches">
+                전체 패치 보기
+            </a>
+
+        </div>
+
+    {% endif %}
+
+    {% for patch in patches %}
+
+        <article class="patch-card">
+
+            <div class="patch-meta">
+                <span class="game-name">
+                    {{ patch.game_name }}
+                </span>
+
+                <span class="meta-divider">
+                    ·
+                </span>
+
+                <span>
+                    {{ patch.display_date }}
+                </span>
+
+                <span class="source-badge">
+                    {{ patch.source_provider }}
+                </span>
+            </div>
+
+
+            <h2 class="patch-title">
+                <a
+                    href="/patches/{{ patch.patch_id }}"
+                >
+                    {{ patch.display_title }}
+                </a>
+            </h2>
+
+
+            {% if patch.summary %}
+
+                <a
+                    class="summary-link"
+                    href="/patches/{{ patch.patch_id }}"
+                >
+                    <div class="patch-summary">
+                        {{ patch.summary }}
+                    </div>
+                </a>
+
+            {% else %}
+
+                <p class="empty-message">
+                    아직 요약되지 않은 패치입니다.
+                </p>
+
+            {% endif %}
+
+
+            <div class="patch-card-footer">
+
+                <div class="status-group">
+
+                    {% if patch.translation_status == "completed" %}
+                        <span class="status-badge">
+                            번역 완료
+                        </span>
+
+                    {% elif patch.translation_status == "skipped" %}
+                        <span class="status-badge">
+                            한국어 원문
+                        </span>
+
+                    {% endif %}
+
+
+                    {% if patch.summary_status == "completed" %}
+                        <span class="status-badge">
+                            요약 완료
+                        </span>
+                    {% endif %}
+
+                </div>
+
+
+                <a
+                    class="detail-link"
+                    href="/patches/{{ patch.patch_id }}"
+                >
+                    전체 패치 보기
+                    <span>
+                        →
+                    </span>
+                </a>
+
+            </div>
+
+        </article>
+
+    {% endfor %}
+
+</section>
+
+{% if total_pages > 1 %}
+
+    <nav
+        class="pagination"
+        aria-label="패치 페이지"
+    >
+
+        {% if previous_url %}
+
+            <a
+                class="page-link page-direction"
+                href="{{ previous_url }}"
+            >
+                ← 이전
+            </a>
+
+        {% else %}
+
+            <span
+                class="page-link page-direction disabled"
+            >
+                ← 이전
+            </span>
+
+        {% endif %}
+
+
+        <div class="page-numbers">
+
+            {% for item in page_items %}
+
+                {% if item.current %}
+
+                    <span
+                        class="page-link current"
+                    >
+                        {{ item.number }}
+                    </span>
+
+                {% else %}
+
+                    <a
+                        class="page-link"
+                        href="{{ item.url }}"
+                    >
+                        {{ item.number }}
+                    </a>
+
+                {% endif %}
+
+            {% endfor %}
+
+        </div>
+
+
+        {% if next_url %}
+
+            <a
+                class="page-link page-direction"
+                href="{{ next_url }}"
+            >
+                다음 →
+            </a>
+
+        {% else %}
+
+            <span
+                class="page-link page-direction disabled"
+            >
+                다음 →
+            </span>
+
+        {% endif %}
+
+    </nav>
+
+
+    <div class="pagination-info">
+        {{ current_page }}
+        /
+        {{ total_pages }}
+        페이지
+    </div>
+
+{% endif %}
+
+{% endblock %}

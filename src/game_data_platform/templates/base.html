@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        {% block title %}
+            Game Patch Viewer
+        {% endblock %}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
+</head>
+
+<body>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a
+                class="brand"
+                href="/patches"
+            >
+                Game Patch Viewer
+            </a>
+
+            <span class="project-name">
+                Game Data Project
+            </span>
+        </div>
+    </header>
+
+    <main class="page-shell">
+        {% block content %}
+        {% endblock %}
+    </main>
+</body>
+</html>
