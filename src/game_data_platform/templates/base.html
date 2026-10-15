@@ -10,35 +10,76 @@
 
     <title>
         {% block title %}
-            Game Patch Viewer
+            Game Data Viewer
         {% endblock %}
     </title>
 
     <link
         rel="stylesheet"
-        href="/static/style.css"
+        href="/static/style.css?v=16"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/dashboard.css?v=16"
     >
 </head>
 
 <body>
+
     <header class="site-header">
+
         <div class="site-header-inner">
+
             <a
                 class="brand"
-                href="/patches"
+                href="/games"
             >
-                Game Patch Viewer
+                Game Data Viewer
             </a>
 
-            <span class="project-name">
-                Game Data Project
-            </span>
+
+            <nav class="site-nav">
+
+                <a
+                    class="site-nav-link
+                    {% if request.url.path.startswith('/games') %}
+                        is-active
+                    {% endif %}
+                    "
+                    href="/games"
+                >
+                    Games
+                </a>
+
+                <a
+                    class="site-nav-link
+                    {% if request.url.path.startswith('/patches') %}
+                        is-active
+                    {% endif %}
+                    "
+                    href="/patches"
+                >
+                    Patches
+                </a>
+
+            </nav>
+
         </div>
+
     </header>
 
+
     <main class="page-shell">
+
         {% block content %}
         {% endblock %}
+
     </main>
+
+
+    {% block scripts %}
+    {% endblock %}
+
 </body>
 </html>

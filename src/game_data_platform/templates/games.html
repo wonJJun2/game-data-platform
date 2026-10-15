@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    Games | Game Data Viewer
+{% endblock %}
+
+
+{% block content %}
+
+<div class="games-page">
+
+    <section class="games-heading">
+
+        <div>
+
+            <p class="dashboard-eyebrow">
+                GAMES
+            </p>
+
+            <h1>
+                게임
+            </h1>
+
+            <p class="games-description">
+                등록된 게임의 현재 동접자와
+                최근 정보를 확인합니다.
+            </p>
+
+        </div>
+
+
+        <div class="games-count">
+
+            <strong>
+                {{ total_count }}
+            </strong>
+
+            <span>
+                games
+            </span>
+
+        </div>
+
+    </section>
+
+
+    {% if games %}
+
+        <section class="game-catalog">
+
+            {% for game in games %}
+
+                <a
+                    class="catalog-card"
+                    href="/games/{{ game.game_id }}"
+                >
+
+                    <div class="catalog-image">
+
+                        <div class="catalog-image-fallback">
+                            {{ game.name }}
+                        </div>
+
+                        <img
+                            src="https://cdn.akamai.steamstatic.com/steam/apps/{{ game.steam_app_id }}/header.jpg"
+                            alt="{{ game.name }}"
+                            loading="lazy"
+                            onerror="this.style.display='none'"
+                        >
+
+                    </div>
+
+
+                    <div class="catalog-content">
+
+                        <div class="catalog-title-row">
+
+                            <h2>
+                                {{ game.name }}
+                            </h2>
+
+                            <span class="catalog-arrow">
+                                →
+                            </span>
+
+                        </div>
+
+
+                        <div class="catalog-player-count">
+
+                            <span>
+                                현재 동접자
+                            </span>
+
+                            {% if game.latest_player_count %}
+
+                                <strong>
+                                    {{
+                                        "{:,}".format(
+                                            game.latest_player_count.player_count
+                                        )
+                                    }}
+                                </strong>
+
+                            {% else %}
+
+                                <strong>
+                                    -
+                                </strong>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                </a>
+
+            {% endfor %}
+
+        </section>
+
+    {% else %}
+
+        <div class="dashboard-empty">
+
+            <h2>
+                등록된 게임이 없습니다.
+            </h2>
+
+            <p>
+                게임을 등록한 뒤 다시 확인해주세요.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

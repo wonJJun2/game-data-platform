@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    {{ game.name }} | Game Data Viewer
+{% endblock %}
+
+
+{% block content %}
+
+<div class="game-detail-page">
+
+    <a
+        class="dashboard-back-link"
+        href="/games"
+    >
+        ← Games
+    </a>
+
+
+    <section class="game-hero">
+
+        <div class="game-hero-image">
+
+            <img
+                src="https://cdn.akamai.steamstatic.com/steam/apps/{{ game.steam_app_id }}/header.jpg"
+                alt="{{ game.name }}"
+                onerror="this.style.display='none'"
+            >
+
+            <div class="game-hero-fallback">
+                {{ game.name }}
+            </div>
+
+        </div>
+
+
+        <div class="game-hero-content">
+
+            <div class="game-hero-title">
+
+                <p class="dashboard-eyebrow">
+                    GAME
+                </p>
+
+                <h1>
+                    {{ game.name }}
+                </h1>
+
+            </div>
+
+
+            <div class="game-current-players">
+
+                <span>
+                    현재 동접자
+                </span>
+
+                {% if latest_player_count %}
+
+                    <strong>
+                        {{
+                            "{:,}".format(
+                                latest_player_count.player_count
+                            )
+                        }}
+                    </strong>
+
+                {% else %}
+
+                    <strong>
+                        -
+                    </strong>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <section class="dashboard-card">
+
+        <div class="dashboard-section-heading">
+
+            <div>
+
+                <p class="dashboard-section-label">
+                    PLAYER COUNT
+                </p>
+
+                <h2>
+                    동접자 추이
+                </h2>
+
+            </div>
+
+
+            <span class="dashboard-section-meta">
+                최근 {{ player_counts | length }}개 데이터 · KST
+            </span>
+
+        </div>
+
+
+        {% if player_counts %}
+
+            <div class="chart-legend">
+
+                <span class="chart-legend-item">
+
+                    <span class="chart-line-sample">
+                    </span>
+
+                    동접자
+
+                </span>
+
+
+                <span class="chart-legend-item">
+
+                    <span class="chart-patch-sample">
+                    </span>
+
+                    패치 날짜
+
+                </span>
+
+            </div>
+
+
+            <div class="player-chart-container">
+
+                <canvas
+                    id="playerCountChart"
+                    aria-label="동접자 추이 차트"
+                ></canvas>
+
+            </div>
+
+
+            <script
+                id="playerChartData"
+                type="application/json"
+            >
+                {{ player_chart_data | tojson }}
+            </script>
+
+
+            <script
+                id="patchMarkerData"
+                type="application/json"
+            >
+                {{ patch_markers | tojson }}
+            </script>
+
+        {% else %}
+
+            <div class="dashboard-empty compact">
+                아직 수집된 동접자 데이터가 없습니다.
+            </div>
+
+        {% endif %}
+
+    </section>
+
+
+    <section class="dashboard-card">
+
+        <div class="dashboard-section-heading">
+
+            <div>
+
+                <p class="dashboard-section-label">
+                    PATCH NOTES
+                </p>
+
+                <h2>
+                    최근 패치
+                </h2>
+
+            </div>
+
+
+            <a
+                class="dashboard-section-link"
+                href="/patches?game={{ game.name | urlencode }}"
+            >
+                전체 보기
+                <span>
+                    →
+                </span>
+            </a>
+
+        </div>
+
+
+        {% if patches %}
+
+            <div class="game-patch-list">
+
+                {% for patch in patches %}
+
+                    <a
+                        class="game-patch-item"
+                        href="/patches/{{ patch.patch_id }}"
+                    >
+
+                        <div class="game-patch-content">
+
+                            <div class="game-patch-meta">
+
+                                <span>
+                                    {{ patch.display_date }}
+                                </span>
+
+                                <span class="game-patch-meta-divider">
+                                    ·
+                                </span>
+
+                                <span>
+                                    {{ patch.source_provider }}
+                                </span>
+
+                            </div>
+
+
+                            <h3>
+                                {{ patch.display_title }}
+                            </h3>
+
+
+                            {% if patch.summary %}
+
+                                <p>
+                                    {{ patch.summary }}
+                                </p>
+
+                            {% else %}
+
+                                <p class="game-patch-empty-summary">
+                                    아직 요약되지 않은 패치입니다.
+                                </p>
+
+                            {% endif %}
+
+                        </div>
+
+
+                        <span class="game-patch-arrow">
+                            →
+                        </span>
+
+                    </a>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="dashboard-empty compact">
+                수집된 패치가 없습니다.
+            </div>
+
+        {% endif %}
+
+    </section>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+></script>
+
+
+<script>
+    const chartCanvas =
+        document.getElementById(
+            "playerCountChart"
+        );
+
+    const chartDataElement =
+        document.getElementById(
+            "playerChartData"
+        );
+
+    const patchDataElement =
+        document.getElementById(
+            "patchMarkerData"
+        );
+
+
+    if (
+        chartCanvas
+        && chartDataElement
+        && patchDataElement
+    ) {
+        const chartData =
+            JSON.parse(
+                chartDataElement.textContent
+            );
+
+        const patchMarkers =
+            JSON.parse(
+                patchDataElement.textContent
+            );
+
+
+        const styles =
+            getComputedStyle(
+                document.documentElement
+            );
+
+        const accent = styles
+            .getPropertyValue("--accent")
+            .trim();
+
+        const border = styles
+            .getPropertyValue("--border")
+            .trim();
+
+        const textSecondary = styles
+            .getPropertyValue(
+                "--text-secondary"
+            )
+            .trim();
+
+
+        const patchIndexes = [];
+
+
+        for (
+            const patch
+            of patchMarkers
+        ) {
+            const index =
+                chartData.dates.findIndex(
+                    (date) =>
+                        date === patch.date
+                );
+
+
+            if (index !== -1) {
+                patchIndexes.push({
+                    index: index,
+                    title: patch.title,
+                    patchId:
+                        patch.patch_id,
+                });
+            }
+        }
+
+
+        const patchMarkerPlugin = {
+            id: "patchMarkerPlugin",
+
+            afterDatasetsDraw(
+                chart
+            ) {
+                const {
+                    ctx,
+                    chartArea,
+                    scales,
+                } = chart;
+
+                const xScale =
+                    scales.x;
+
+
+                ctx.save();
+
+
+                for (
+                    const marker
+                    of patchIndexes
+                ) {
+                    const x =
+                        xScale.getPixelForValue(
+                            marker.index
+                        );
+
+
+                    ctx.beginPath();
+
+                    ctx.setLineDash(
+                        [4, 5]
+                    );
+
+                    ctx.strokeStyle =
+                        "rgba(68, 97, 242, 0.45)";
+
+                    ctx.lineWidth = 1;
+
+                    ctx.moveTo(
+                        x,
+                        chartArea.top
+                    );
+
+                    ctx.lineTo(
+                        x,
+                        chartArea.bottom
+                    );
+
+                    ctx.stroke();
+
+
+                    ctx.setLineDash(
+                        []
+                    );
+
+
+                    ctx.fillStyle =
+                        accent;
+
+                    ctx.beginPath();
+
+                    ctx.arc(
+                        x,
+                        chartArea.top + 6,
+                        4,
+                        0,
+                        Math.PI * 2
+                    );
+
+                    ctx.fill();
+                }
+
+
+                ctx.restore();
+            },
+        };
+
+
+        new Chart(
+            chartCanvas,
+            {
+                type: "line",
+
+                data: {
+                    labels:
+                        chartData.labels,
+
+                    datasets: [
+                        {
+                            label:
+                                "동접자",
+
+                            data:
+                                chartData.values,
+
+                            borderColor:
+                                accent,
+
+                            backgroundColor:
+                                accent,
+
+                            borderWidth:
+                                2,
+
+                            pointRadius:
+                                0,
+
+                            pointHoverRadius:
+                                5,
+
+                            pointHitRadius:
+                                16,
+
+                            tension:
+                                0.28,
+
+                            fill:
+                                false,
+                        },
+                    ],
+                },
+
+
+                plugins: [
+                    patchMarkerPlugin,
+                ],
+
+
+                options: {
+                    responsive:
+                        true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    interaction: {
+                        mode:
+                            "index",
+
+                        intersect:
+                            false,
+                    },
+
+
+                    plugins: {
+                        legend: {
+                            display:
+                                false,
+                        },
+
+
+                        tooltip: {
+                            displayColors:
+                                false,
+
+                            callbacks: {
+                                label(
+                                    context
+                                ) {
+                                    return (
+                                        "동접자 "
+                                        + context
+                                            .parsed
+                                            .y
+                                            .toLocaleString()
+                                        + "명"
+                                    );
+                                },
+
+
+                                afterBody(
+                                    contexts
+                                ) {
+                                    if (
+                                        !contexts.length
+                                    ) {
+                                        return [];
+                                    }
+
+
+                                    const index =
+                                        contexts[0]
+                                            .dataIndex;
+
+
+                                    const markers =
+                                        patchIndexes.filter(
+                                            (item) =>
+                                                item.index
+                                                === index
+                                        );
+
+
+                                    if (
+                                        !markers.length
+                                    ) {
+                                        return [];
+                                    }
+
+
+                                    return [
+                                        "",
+                                        ...markers.map(
+                                            (item) =>
+                                                "패치 · "
+                                                + item.title
+                                        ),
+                                    ];
+                                },
+                            },
+                        },
+                    },
+
+
+                    scales: {
+                        x: {
+                            grid: {
+                                display:
+                                    false,
+                            },
+
+                            border: {
+                                display:
+                                    false,
+                            },
+
+                            ticks: {
+                                color:
+                                    textSecondary,
+
+                                maxTicksLimit:
+                                    7,
+
+                                maxRotation:
+                                    0,
+
+                                autoSkip:
+                                    true,
+                            },
+                        },
+
+
+                        y: {
+                            border: {
+                                display:
+                                    false,
+                            },
+
+                            grid: {
+                                color:
+                                    border,
+                            },
+
+                            ticks: {
+                                color:
+                                    textSecondary,
+
+                                callback(
+                                    value
+                                ) {
+                                    return Number(
+                                        value
+                                    ).toLocaleString();
+                                },
+                            },
+                        },
+                    },
+                },
+            }
+        );
+    }
+</script>
+
+{% endblock %}

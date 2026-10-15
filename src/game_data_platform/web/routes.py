@@ -1,12 +1,16 @@
 from math import ceil
 from pathlib import Path
 from urllib.parse import urlencode
-
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from game_data_platform.storage import (
+    get_game,
+    get_games,
+    get_latest_player_count,
+    get_player_counts,
     get_patch_viewer_count,
     get_patch_viewer_detail,
     get_patch_viewer_games,
@@ -24,6 +28,8 @@ from game_data_platform.web.presentation import (
     normalize_patch_title,
 )
 
+KST = ZoneInfo("Asia/Seoul")
+
 router = APIRouter()
 
 
@@ -33,6 +39,177 @@ templates = Jinja2Templates(
     directory=PACKAGE_DIR / "templates",
 )
 
+@router.get(
+    "/games",
+    response_class=HTMLResponse,
+)
+def game_list(
+    request: Request,
+):
+    games = get_games()
+
+    for game in games:
+        latest_player_count = (
+            get_latest_player_count(
+                game["game_id"]
+            )
+        )
+
+        game["latest_player_count"] = (
+            latest_player_count
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="games.html",
+        context={
+            "page_title": (
+                "Game Data Viewer"
+            ),
+            "games": games,
+            "total_count": len(games),
+        },
+    )
+
+@router.get(
+    "/games/{game_id}",
+    response_class=HTMLResponse,
+    name="game_detail",
+)
+def game_detail(
+    request: Request,
+    game_id: int,
+):
+    game = get_game(
+        game_id=game_id,
+    )
+
+    if game is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="404.html",
+            context={
+                "page_title": (
+                    "게임을 찾을 수 없습니다"
+                ),
+            },
+            status_code=404,
+        )
+
+    latest_player_count = (
+        get_latest_player_count(
+            game_id=game_id,
+        )
+    )
+
+    player_counts = get_player_counts(
+        game_id=game_id,
+        limit=168,
+        order="desc",
+    )
+
+    # 최신 168건을 가져온 뒤
+    # 화면에서는 시간순으로 사용한다.
+    player_counts.reverse()
+
+    for item in player_counts:
+        collected_at_kst = (
+            item["collected_at"]
+            .astimezone(KST)
+        )
+
+        item["display_collected_at"] = (
+            collected_at_kst.strftime(
+                "%m.%d %H:%M"
+            )
+        )
+
+        item["chart_date"] = (
+            collected_at_kst.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+    player_chart_data = {
+        "labels": [
+            item["display_collected_at"]
+            for item in player_counts
+        ],
+        "dates": [
+            item["chart_date"]
+            for item in player_counts
+        ],
+        "values": [
+            item["player_count"]
+            for item in player_counts
+        ],
+    }
+
+    patches = get_patch_viewer_list(
+        limit=5,
+        offset=0,
+        game_name=game["name"],
+        query_text=None,
+    )
+
+    for patch in patches:
+        patch["display_date"] = (
+            format_patch_date(
+                patch["source_date"]
+            )
+        )
+
+        patch["display_title"] = (
+            normalize_patch_title(
+                game_name=patch[
+                    "game_name"
+                ],
+                translated_title=patch[
+                    "display_title"
+                ],
+                original_title=patch[
+                    "original_title"
+                ],
+            )
+        )
+
+    patch_markers = [
+        {
+            "date": (
+                patch["source_date"].strftime(
+                    "%Y-%m-%d"
+                )
+                if patch["source_date"]
+                else None
+            ),
+            "title": patch["display_title"],
+            "patch_id": patch["patch_id"],
+        }
+        for patch in patches
+        if patch["source_date"]
+    ]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="game_detail.html",
+        context={
+            "page_title": game["name"],
+            "game": game,
+            "latest_player_count": (
+                latest_player_count
+            ),
+            "player_counts": (
+                player_counts
+            ),
+            "player_chart_data": (
+                player_chart_data
+            ),
+            "patches": patches,
+            "patch_markers": (
+                patch_markers
+            ),
+        },
+    )
 
 @router.get(
     "/patches",
