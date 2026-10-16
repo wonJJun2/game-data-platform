@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -8,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -46,7 +48,12 @@ class Game(Base):
     genre: Mapped[str | None] = mapped_column(
     Text,
     nullable=True,
-)
+    )
+
+    header_image_url: Mapped[str | None] = mapped_column(
+    Text,
+    nullable=True,
+    )
 
 class PlayerCount(Base):
     __tablename__ = "player_counts"
@@ -76,6 +83,149 @@ Index(
     "idx_player_counts_game_collected_at",
     PlayerCount.game_id,
     PlayerCount.collected_at.desc(),
+)
+
+class GamePriceCurrent(Base):
+    __tablename__ = "game_price_current"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id"),
+        nullable=False,
+    )
+
+    provider: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+    )
+
+    country_code: Mapped[str] = mapped_column(
+        String(2),
+        nullable=False,
+    )
+
+    price_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    is_free: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+    )
+
+    currency: Mapped[str | None] = mapped_column(
+        String(3),
+        nullable=True,
+    )
+
+    initial_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2),
+        nullable=True,
+    )
+
+    final_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2),
+        nullable=True,
+    )
+
+    discount_percent: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "game_id",
+            "provider",
+            "country_code",
+            name=(
+                "uq_game_price_current_"
+                "game_provider_country"
+            ),
+        ),
+    )
+
+
+class GamePriceHistory(Base):
+    __tablename__ = "game_price_history"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id"),
+        nullable=False,
+    )
+
+    provider: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+    )
+
+    country_code: Mapped[str] = mapped_column(
+        String(2),
+        nullable=False,
+    )
+
+    price_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    is_free: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+    )
+
+    currency: Mapped[str | None] = mapped_column(
+        String(3),
+        nullable=True,
+    )
+
+    initial_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2),
+        nullable=True,
+    )
+
+    final_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2),
+        nullable=True,
+    )
+
+    discount_percent: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+Index(
+    "idx_game_price_history_game_changed_at",
+    GamePriceHistory.game_id,
+    GamePriceHistory.changed_at.desc(),
 )
 
 class SteamNews(Base):

@@ -16,7 +16,18 @@ def get_current_players(app_id: int) -> int:
 
     data = response.json()
 
-    return data["response"]["player_count"]
+    player_count = (
+        data.get("response", {})
+        .get("player_count")
+    )
+
+    if player_count is None:
+        raise ValueError(
+            "Steam player count is unavailable "
+            f"for app_id={app_id}"
+        )
+
+    return int(player_count)
 
 def get_news_for_app(
     app_id: int,

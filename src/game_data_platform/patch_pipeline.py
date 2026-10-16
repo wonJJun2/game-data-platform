@@ -1,6 +1,6 @@
 import logging
 
-from game_data_platform import GAMES
+from game_data_platform.storage import get_games
 from game_data_platform.news_collector import collect_news
 from game_data_platform.overwatch_collector import (
     collect_overwatch_patch_notes,
@@ -20,9 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 def run_patch_pipeline() -> dict:
+    games = get_games()
+
     # 1. Steam News 수집
     steam_collection = collect_news(
-        GAMES,
+        games,
         count=20,
     )
 

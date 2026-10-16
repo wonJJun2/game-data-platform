@@ -23,7 +23,13 @@
         <div class="game-hero-image">
 
             <img
-                src="https://cdn.akamai.steamstatic.com/steam/apps/{{ game.steam_app_id }}/header.jpg"
+                src="{{
+                    game.header_image_url
+                    or
+                    'https://cdn.akamai.steamstatic.com/steam/apps/'
+                    ~ game.steam_app_id
+                    ~ '/header.jpg'
+                }}"
                 alt="{{ game.name }}"
                 onerror="this.style.display='none'"
             >

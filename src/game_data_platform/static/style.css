@@ -1173,6 +1173,7 @@ a.page-link:hover {
     overflow: hidden;
 
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 
     color: var(--text-secondary);
@@ -1820,6 +1821,7 @@ a.page-link:hover {
     overflow: hidden;
 
     -webkit-line-clamp: 2;
+    line-clamp: 2;
 
     -webkit-box-orient:
         vertical;

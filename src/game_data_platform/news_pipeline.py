@@ -1,6 +1,6 @@
 import logging
 
-from game_data_platform import GAMES
+from game_data_platform.storage import get_games
 from game_data_platform.news_collector import collect_news
 from game_data_platform.patch_processor import process_patch_detection
 
@@ -9,8 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 def run_news_pipeline() -> dict:
+    games = get_games()
+
     collection_results = collect_news(
-        GAMES,
+        games,
         count=20,
     )
 

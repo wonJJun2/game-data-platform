@@ -42,6 +42,20 @@ services:
     command: uv run --no-dev game-data-patch-llm
     restart: "no"
 
+  price-init:
+    build: .
+    container_name: game-data-price-init
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uv run --no-dev game-data-price
+    restart: "no"
+
   db:
     image: postgres:17
     container_name: game-data-db

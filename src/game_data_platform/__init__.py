@@ -1,23 +1,14 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 import psycopg
 
 from game_data_platform.steam import get_current_players
-from game_data_platform.storage import save_player_count
-
-
-GAMES = [
-    {"name": "THE FINALS", "app_id": 2073850},
-    {"name": "Overwatch", "app_id": 2357570},
-    {"name": "PUBG: BATTLEGROUNDS", "app_id": 578080},
-    {"name": "Counter-Strike 2", "app_id": 730},
-    {"name": "Apex 레전드", "app_id": 1172470},
-    {"name": "마블 라이벌즈", "app_id": 2767030},
-    {"name": "Dota 2", "app_id": 570},
-    {"name": "퍼스트 디센던트", "app_id": 2074920},
-]
+from game_data_platform.storage import (
+    get_games,
+    save_player_count,
+)
 
 
 logging.basicConfig(
@@ -35,13 +26,17 @@ logger = logging.getLogger(__name__)
 
 
 def collect_game(game: dict) -> None:
-    player_count = get_current_players(game["app_id"])
+    steam_app_id = game["steam_app_id"]
+
+    player_count = get_current_players(
+        steam_app_id
+    )
 
     data = {
-        "app_id": game["app_id"],
+        "app_id": steam_app_id,
         "name": game["name"],
         "player_count": player_count,
-        "collected_at": datetime.now().astimezone(),
+        "collected_at": datetime.now(timezone.utc),
     }
 
     save_player_count(data)
@@ -49,13 +44,15 @@ def collect_game(game: dict) -> None:
     logger.info(
         "%s | app_id=%s | player_count=%s",
         game["name"],
-        game["app_id"],
+        steam_app_id,
         player_count,
     )
 
 
 def main() -> None:
-    for game in GAMES:
+    games = get_games()
+
+    for game in games:
         try:
             collect_game(game)
 
@@ -63,7 +60,7 @@ def main() -> None:
             logger.error(
                 "게임 기준정보 오류 - %s (%s): %s",
                 game["name"],
-                game["app_id"],
+                game["steam_app_id"],
                 exc,
             )
 
@@ -71,7 +68,7 @@ def main() -> None:
             logger.error(
                 "DB 저장 실패 - %s (%s): %s",
                 game["name"],
-                game["app_id"],
+                game["steam_app_id"],
                 exc,
             )
 

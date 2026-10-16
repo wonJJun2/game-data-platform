@@ -5,7 +5,10 @@ import httpx
 import psycopg
 
 from game_data_platform.steam import get_news_for_app
-from game_data_platform.storage import save_steam_news
+from game_data_platform.storage import (
+    get_games,
+    save_steam_news,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -15,18 +18,22 @@ def collect_news_for_game(
     game: dict,
     count: int = 20,
 ) -> dict:
+    steam_app_id = game["steam_app_id"]
+
     news_items = get_news_for_app(
-        app_id=game["app_id"],
+        app_id=steam_app_id,
         count=count,
     )
 
-    collected_at = datetime.now(timezone.utc)
+    collected_at = datetime.now(
+        timezone.utc
+    )
 
     inserted_count = 0
 
     for item in news_items:
         data = {
-            "app_id": game["app_id"],
+            "app_id": steam_app_id,
             "steam_gid": item["gid"],
             "title": item["title"],
             "url": item["url"],
@@ -36,18 +43,31 @@ def collect_news_for_game(
             ),
             "author": item.get("author"),
             "contents": item.get("contents"),
-            "feed_label": item.get("feedlabel"),
-            "feed_name": item.get("feedname"),
-            "feed_type": item.get("feed_type"),
-            "published_at": datetime.fromtimestamp(
-                item["date"],
-                tz=timezone.utc,
+            "feed_label": item.get(
+                "feedlabel"
             ),
-            "tags": item.get("tags", []),
+            "feed_name": item.get(
+                "feedname"
+            ),
+            "feed_type": item.get(
+                "feed_type"
+            ),
+            "published_at": (
+                datetime.fromtimestamp(
+                    item["date"],
+                    tz=timezone.utc,
+                )
+            ),
+            "tags": item.get(
+                "tags",
+                [],
+            ),
             "collected_at": collected_at,
         }
 
-        inserted = save_steam_news(data)
+        inserted = save_steam_news(
+            data
+        )
 
         if inserted:
             inserted_count += 1
@@ -60,7 +80,7 @@ def collect_news_for_game(
     )
 
     return {
-        "app_id": game["app_id"],
+        "steam_app_id": steam_app_id,
         "name": game["name"],
         "fetched": len(news_items),
         "inserted": inserted_count,
@@ -85,7 +105,7 @@ def collect_news(
             logger.error(
                 "게임 기준정보 오류 - %s (%s): %s",
                 game["name"],
-                game["app_id"],
+                game["steam_app_id"],
                 exc,
             )
 
@@ -93,7 +113,7 @@ def collect_news(
             logger.error(
                 "DB 저장 실패 - %s (%s): %s",
                 game["name"],
-                game["app_id"],
+                game["steam_app_id"],
                 exc,
             )
 
@@ -120,10 +140,10 @@ def collect_news(
     return results
 
 def main() -> None:
-    from game_data_platform import GAMES
+    games = get_games()
 
     results = collect_news(
-        GAMES,
+        games,
         count=20,
     )
 

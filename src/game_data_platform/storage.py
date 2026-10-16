@@ -61,6 +61,7 @@ def get_games():
                 "steam_app_id": game.steam_app_id,
                 "name": game.name,
                 "created_at": game.created_at,
+                "header_image_url": game.header_image_url,
             }
             for game in games
         ]
@@ -77,6 +78,7 @@ def get_game(game_id: int):
             "steam_app_id": game.steam_app_id,
             "name": game.name,
             "created_at": game.created_at,
+            "header_image_url": game.header_image_url,
         }
 
 def get_player_counts(
@@ -646,6 +648,269 @@ def get_game_by_steam_app_id(
         "game_id": row[0],
         "steam_app_id": row[1],
         "name": row[2],
+    }
+
+def save_game_price(
+    data: dict,
+) -> dict:
+    game = get_game_by_steam_app_id(
+        data["steam_app_id"]
+    )
+
+    if game is None:
+        raise ValueError(
+            "Game is not registered: "
+            f"steam_app_id={data['steam_app_id']}"
+        )
+
+    game_id = game["game_id"]
+
+    update_game_image_query = """
+        UPDATE games
+        SET header_image_url = %s
+        WHERE game_id = %s
+        AND header_image_url
+            IS DISTINCT FROM %s
+    """
+
+    select_query = """
+        SELECT
+            id,
+            price_status,
+            is_free,
+            currency,
+            initial_price,
+            final_price,
+            discount_percent
+        FROM game_price_current
+        WHERE game_id = %s
+          AND provider = %s
+          AND country_code = %s
+        FOR UPDATE
+    """
+
+    insert_current_query = """
+        INSERT INTO game_price_current (
+            game_id,
+            provider,
+            country_code,
+            price_status,
+            is_free,
+            currency,
+            initial_price,
+            final_price,
+            discount_percent,
+            checked_at,
+            changed_at
+        )
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            NOW(), NOW()
+        )
+        RETURNING id
+    """
+
+    update_current_query = """
+        UPDATE game_price_current
+        SET
+            price_status = %s,
+            is_free = %s,
+            currency = %s,
+            initial_price = %s,
+            final_price = %s,
+            discount_percent = %s,
+            checked_at = NOW(),
+            changed_at = NOW()
+        WHERE id = %s
+    """
+
+    touch_current_query = """
+        UPDATE game_price_current
+        SET checked_at = NOW()
+        WHERE id = %s
+    """
+
+    insert_history_query = """
+        INSERT INTO game_price_history (
+            game_id,
+            provider,
+            country_code,
+            price_status,
+            is_free,
+            currency,
+            initial_price,
+            final_price,
+            discount_percent,
+            changed_at
+        )
+        VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            NOW()
+        )
+        RETURNING id
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            header_image_url = data.get(
+                "header_image_url"
+            )
+
+            if header_image_url is not None:
+                cur.execute(
+                    update_game_image_query,
+                    (
+                        header_image_url,
+                        game_id,
+                        header_image_url,
+                    ),
+                )
+
+            cur.execute(
+                select_query,
+                (
+                    game_id,
+                    data["provider"],
+                    data["country_code"],
+                ),
+            )
+
+            current = cur.fetchone()
+
+            if current is None:
+                cur.execute(
+                    insert_current_query,
+                    (
+                        game_id,
+                        data["provider"],
+                        data["country_code"],
+                        data["price_status"],
+                        data["is_free"],
+                        data["currency"],
+                        data["initial_price"],
+                        data["final_price"],
+                        data["discount_percent"],
+                    ),
+                )
+
+                current_id = cur.fetchone()[0]
+
+                cur.execute(
+                    insert_history_query,
+                    (
+                        game_id,
+                        data["provider"],
+                        data["country_code"],
+                        data["price_status"],
+                        data["is_free"],
+                        data["currency"],
+                        data["initial_price"],
+                        data["final_price"],
+                        data["discount_percent"],
+                    ),
+                )
+
+                history_id = cur.fetchone()[0]
+
+                conn.commit()
+
+                return {
+                    "game_id": game_id,
+                    "current_id": current_id,
+                    "history_id": history_id,
+                    "changed": True,
+                    "action": "created",
+                }
+
+            (
+                current_id,
+                current_price_status,
+                current_is_free,
+                current_currency,
+                current_initial_price,
+                current_final_price,
+                current_discount_percent,
+            ) = current
+
+            has_changed = any(
+                (
+                    current_price_status
+                    != data["price_status"],
+
+                    current_is_free
+                    != data["is_free"],
+
+                    current_currency
+                    != data["currency"],
+
+                    current_initial_price
+                    != data["initial_price"],
+
+                    current_final_price
+                    != data["final_price"],
+
+                    current_discount_percent
+                    != data["discount_percent"],
+                )
+            )
+
+            if not has_changed:
+                cur.execute(
+                    touch_current_query,
+                    (current_id,),
+                )
+
+                conn.commit()
+
+                return {
+                    "game_id": game_id,
+                    "current_id": current_id,
+                    "history_id": None,
+                    "changed": False,
+                    "action": "checked",
+                }
+
+            cur.execute(
+                update_current_query,
+                (
+                    data["price_status"],
+                    data["is_free"],
+                    data["currency"],
+                    data["initial_price"],
+                    data["final_price"],
+                    data["discount_percent"],
+                    current_id,
+                ),
+            )
+
+            cur.execute(
+                insert_history_query,
+                (
+                    game_id,
+                    data["provider"],
+                    data["country_code"],
+                    data["price_status"],
+                    data["is_free"],
+                    data["currency"],
+                    data["initial_price"],
+                    data["final_price"],
+                    data["discount_percent"],
+                ),
+            )
+
+            history_id = cur.fetchone()[0]
+
+        conn.commit()
+
+    return {
+        "game_id": game_id,
+        "current_id": current_id,
+        "history_id": history_id,
+        "changed": True,
+        "action": "changed",
     }
 
 def get_game_patches_for_processing(

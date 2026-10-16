@@ -23,6 +23,7 @@ game-data-platform = "game_data_platform:main"
 game-data-news = "game_data_platform.news_pipeline:main"
 game-data-patches = "game_data_platform.patch_pipeline:main"
 game-data-patch-llm = "game_data_platform.patch_llm_processor:main"
+game-data-price = "game_data_platform.price_collector:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
