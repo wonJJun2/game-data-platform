@@ -193,15 +193,19 @@
             </h2>
 
 
-            {% if patch.summary %}
+            {% if patch.summary_items %}
 
                 <a
                     class="summary-link"
                     href="/patches/{{ patch.patch_id }}"
                 >
-                    <div class="patch-summary">
-                        {{ patch.summary }}
-                    </div>
+                    <ul class="patch-summary-list">
+                        {% for item in patch.summary_items %}
+                            <li>
+                                {{ item }}
+                            </li>
+                        {% endfor %}
+                    </ul>
                 </a>
 
             {% else %}

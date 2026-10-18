@@ -14,7 +14,9 @@ from game_data_platform.patch_processor import (
 from game_data_platform.patch_sync import (
     sync_game_patches,
 )
-
+from game_data_platform.patch_llm_processor import (
+    run_patch_llm_processing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +47,18 @@ def run_patch_pipeline() -> dict:
     # 5. 모든 소스를 공통 game_patches로 동기화
     patch_sync = sync_game_patches()
 
+    # 6. 신규/변경 패치 번역 및 요약
+    llm_processing = run_patch_llm_processing(
+        process_limit=0,
+    )
+
     result = {
         "steam_collection": steam_collection,
         "steam_detection": steam_detection,
-        "pubg_collection": (
-            pubg_collection
-        ),
-        "overwatch_collection": (
-            overwatch_collection
-        ),
+        "pubg_collection": pubg_collection,
+        "overwatch_collection": overwatch_collection,
         "patch_sync": patch_sync,
+        "llm_processing": llm_processing,
     }
 
     logger.info(

@@ -42,6 +42,65 @@
             {{ patch.display_title }}
         </h1>
 
+        {% if request.query_params.get("processing_started") %}
+            <div class="processing-notice">
+                번역·요약 처리를 시작했습니다.
+                처리 완료 후 페이지를 새로고침하면 결과가 반영됩니다.
+            </div>
+        {% endif %}
+
+        <div class="patch-processing-actions">
+
+            {% set processing_completed =
+                (
+                    patch.translation_status in ["completed", "skipped"]
+                    and patch.summary_status == "completed"
+                )
+            %}
+
+            {% if processing_completed %}
+
+                <form
+                    method="post"
+                    action="/patches/{{ patch.patch_id }}/process?force=true"
+                >
+                    <button
+                        class="processing-button"
+                        type="submit"
+                    >
+                        번역·요약 다시 실행
+                    </button>
+                </form>
+
+            {% else %}
+
+                <form
+                    method="post"
+                    action="/patches/{{ patch.patch_id }}/process"
+                >
+                    <button
+                        class="processing-button"
+                        type="submit"
+                    >
+                        번역·요약 실행
+                    </button>
+                </form>
+
+            {% endif %}
+
+            <div class="processing-status">
+                <span>
+                    번역:
+                    {{ patch.translation_status or "미처리" }}
+                </span>
+
+                <span>
+                    요약:
+                    {{ patch.summary_status or "미처리" }}
+                </span>
+            </div>
+
+        </div>
 
         <div class="status-group">
 

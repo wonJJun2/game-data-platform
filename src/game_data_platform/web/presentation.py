@@ -120,16 +120,14 @@ def build_summary_items(
         if not line:
             continue
 
-        if line.startswith(
-            (
-                "- ",
-                "• ",
-                "* ",
-            )
-        ):
-            line = line[2:].strip()
+        line = re.sub(
+            r"^[*•-]\s*",
+            "",
+            line,
+        ).strip()
 
-        items.append(line)
+        if line:
+            items.append(line)
 
     return items
 
@@ -179,6 +177,13 @@ GAME_TITLE_ALIASES = {
         "The First Descendant",
         "퍼스트 디센던트",
     ),
+    "Raft": (
+        "Raft",
+        "래프트(Raft)",
+        "라프트(Raft)",
+        "래프트",
+        "라프트",
+    ),
 }
 
 
@@ -223,31 +228,37 @@ def normalize_patch_title(
 
     normalized_title = title
 
-    # 제목 맨 앞의 게임명을
-    # games.name 기준으로 통일
-    for alias in aliases:
-        if not normalized_title.lower().startswith(
-            alias.lower()
+    # 긴 alias부터 처리해서
+    # "래프트(Raft)"가 "래프트"보다 먼저 매칭되게 한다.
+    sorted_aliases = sorted(
+        set(aliases),
+        key=len,
+        reverse=True,
+    )
+
+    # 제목 어디에 있든 게임명 표기를
+    # games.name 기준으로 한 번 통일
+    for alias in sorted_aliases:
+        pattern = re.escape(alias)
+
+        if not re.search(
+            pattern,
+            normalized_title,
+            flags=re.IGNORECASE,
         ):
             continue
 
-        remainder = normalized_title[
-            len(alias):
-        ].lstrip(
-            " :-–—"
+        normalized_title = re.sub(
+            pattern,
+            game_name,
+            normalized_title,
+            count=1,
+            flags=re.IGNORECASE,
         )
-
-        if not remainder:
-            normalized_title = game_name
-        else:
-            normalized_title = (
-                f"{game_name} {remainder}"
-            )
 
         break
 
-    # 패치 제목에서 자주 등장하는
-    # 영문 용어를 한국어로 통일
+    # 자주 등장하는 영문 패치 용어 통일
     for pattern, replacement in (
         TITLE_TERM_REPLACEMENTS
     ):
@@ -258,7 +269,50 @@ def normalize_patch_title(
             flags=re.IGNORECASE,
         )
 
-    # 혹시 치환 과정에서 공백이 중복되면 정리
+    # "핫픽스 - Raft 1.08"
+    # → "Raft 1.08 핫픽스"
+    hotfix_prefix_match = re.match(
+        rf"^핫픽스\s*[-:–—]?\s*"
+        rf"{re.escape(game_name)}\s+(.+)$",
+        normalized_title,
+        flags=re.IGNORECASE,
+    )
+
+    if hotfix_prefix_match:
+        remainder = (
+            hotfix_prefix_match
+            .group(1)
+            .strip()
+        )
+
+        normalized_title = (
+            f"{game_name} "
+            f"{remainder} "
+            "핫픽스"
+        )
+
+    # "Raft 핫픽스 1.08"
+    # → "Raft 1.08 핫픽스"
+    hotfix_after_game_match = re.match(
+        rf"^{re.escape(game_name)}\s+"
+        rf"핫픽스\s*[-:–—]?\s*(.+)$",
+        normalized_title,
+        flags=re.IGNORECASE,
+    )
+
+    if hotfix_after_game_match:
+        remainder = (
+            hotfix_after_game_match
+            .group(1)
+            .strip()
+        )
+
+        normalized_title = (
+            f"{game_name} "
+            f"{remainder} "
+            "핫픽스"
+        )
+
     normalized_title = re.sub(
         r"\s+",
         " ",

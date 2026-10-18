@@ -1002,6 +1002,86 @@ def get_game_patches_for_processing(
         for row in rows
     ]
 
+def get_game_patch_for_processing(
+    patch_id: int,
+) -> dict | None:
+    query = """
+        SELECT
+            gp.id,
+            gp.game_id,
+            g.name,
+            gp.source_provider,
+            gp.source_language,
+            gp.title,
+            gp.content_text,
+
+            gpp.source_content_hash,
+
+            gpp.translation_status,
+            gpp.translated_title,
+            gpp.translated_content,
+            gpp.translation_provider,
+            gpp.translation_model,
+            gpp.translation_prompt_version,
+            gpp.translation_error,
+
+            gpp.summary_status,
+            gpp.summary,
+            gpp.summary_provider,
+            gpp.summary_model,
+            gpp.summary_prompt_version,
+            gpp.summary_error
+
+        FROM game_patches gp
+
+        JOIN games g
+            ON g.game_id = gp.game_id
+
+        LEFT JOIN game_patch_processing gpp
+            ON gpp.patch_id = gp.id
+            AND gpp.target_language = 'ko'
+
+        WHERE gp.id = %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (patch_id,),
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "patch_id": row[0],
+        "game_id": row[1],
+        "game_name": row[2],
+        "source_provider": row[3],
+        "source_language": row[4],
+        "title": row[5],
+        "content_text": row[6],
+
+        "source_content_hash": row[7],
+
+        "translation_status": row[8],
+        "translated_title": row[9],
+        "translated_content": row[10],
+        "translation_provider": row[11],
+        "translation_model": row[12],
+        "translation_prompt_version": row[13],
+        "translation_error": row[14],
+
+        "summary_status": row[15],
+        "summary": row[16],
+        "summary_provider": row[17],
+        "summary_model": row[18],
+        "summary_prompt_version": row[19],
+        "summary_error": row[20],
+    }
+
 def ensure_game_patch_processing(
     patch_id: int,
     target_language: str,
@@ -1148,78 +1228,6 @@ def save_patch_summary(
                     model,
                     prompt_version,
                     patch_id,
-                ),
-            )
-
-        conn.commit()
-
-def ensure_game_patch_processing(
-    patch_id: int,
-    target_language: str,
-    source_content_hash: str,
-    translation_status: str,
-) -> None:
-    query = """
-        INSERT INTO game_patch_processing (
-            patch_id,
-            target_language,
-            source_content_hash,
-            translation_status,
-            summary_status
-        )
-        VALUES (
-            %s,
-            %s,
-            %s,
-            %s,
-            'pending'
-        )
-
-        ON CONFLICT (
-            patch_id,
-            target_language
-        )
-
-        DO UPDATE SET
-            source_content_hash =
-                EXCLUDED.source_content_hash,
-
-            translation_status =
-                EXCLUDED.translation_status,
-
-            translated_title = NULL,
-            translated_content = NULL,
-            translation_provider = NULL,
-            translation_model = NULL,
-            translation_prompt_version = NULL,
-            translation_error = NULL,
-            translated_at = NULL,
-
-            summary_status = 'pending',
-            summary = NULL,
-            summary_provider = NULL,
-            summary_model = NULL,
-            summary_prompt_version = NULL,
-            summary_error = NULL,
-            summarized_at = NULL,
-
-            updated_at = NOW()
-
-        WHERE
-            game_patch_processing.source_content_hash
-            IS DISTINCT FROM
-            EXCLUDED.source_content_hash
-    """
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                query,
-                (
-                    patch_id,
-                    target_language,
-                    source_content_hash,
-                    translation_status,
                 ),
             )
 

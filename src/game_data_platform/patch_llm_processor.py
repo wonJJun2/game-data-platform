@@ -23,6 +23,9 @@ from game_data_platform.storage import (
     save_patch_translation,
     start_patch_summary,
     start_patch_translation,
+    ensure_game_patch_processing,
+    get_game_patch_for_processing,
+    get_game_patches_for_processing,
 )
 from game_data_platform.text_utils import (
     clean_patch_content,
@@ -136,6 +139,7 @@ def needs_processing(
 def process_patch(
     patch: dict,
     client,
+    force: bool = False,
 ) -> None:
     patch_id = patch["patch_id"]
 
@@ -193,7 +197,8 @@ def process_patch(
 
     if source_language == "ko":
         if (
-            content_changed
+            force
+            or content_changed
             or patch["translation_status"]
             != "skipped"
         ):
@@ -210,7 +215,8 @@ def process_patch(
 
     elif source_language == "en":
         translation_needed = (
-            content_changed
+            force
+            or content_changed
             or patch["translation_status"]
             != "completed"
             or patch[
@@ -328,7 +334,8 @@ def process_patch(
     # ---------------------------------
 
     summary_needed = (
-        content_changed
+        force
+        or content_changed
         or translation_reran
         or patch["summary_status"]
         != "completed"
@@ -392,37 +399,58 @@ def process_patch(
             error=str(exc),
         )
 
-
-def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format=(
-            "%(asctime)s | "
-            "%(levelname)s | "
-            "%(message)s"
-        ),
+def process_patch_by_id(
+    patch_id: int,
+    force: bool = False,
+) -> dict:
+    patch = get_game_patch_for_processing(
+        patch_id
     )
 
-    process_limit = int(
-        os.getenv(
-            "PATCH_LLM_PROCESS_LIMIT",
-            "10",
-        )
-    )
+    if patch is None:
+        return {
+            "patch_id": patch_id,
+            "status": "not_found",
+        }
 
-    scan_page_size = int(
-        os.getenv(
-            "PATCH_LLM_SCAN_PAGE_SIZE",
-            "50",
-        )
-    )
+    if (
+        not force
+        and not needs_processing(patch)
+    ):
+        return {
+            "patch_id": patch_id,
+            "status": "already_completed",
+        }
 
     client = create_llm_client()
+
+    process_patch(
+        patch=patch,
+        client=client,
+        force=force,
+    )
+
+    return {
+        "patch_id": patch_id,
+        "status": "processed",
+    }
+
+def run_patch_llm_processing(
+    process_limit: int = 0,
+    scan_page_size: int = 50,
+) -> dict:
+    client = create_llm_client()
+
+    limit_label = (
+        process_limit
+        if process_limit > 0
+        else "unlimited"
+    )
 
     logger.info(
         "LLM processing started "
         "limit=%s provider=%s model=%s",
-        process_limit,
+        limit_label,
         client.provider,
         client.model,
     )
@@ -430,12 +458,16 @@ def main() -> None:
     processed_count = 0
     offset = 0
 
-    while processed_count < process_limit:
-        patches = (
-            get_game_patches_for_processing(
-                limit=scan_page_size,
-                offset=offset,
-            )
+    while True:
+        if (
+            process_limit > 0
+            and processed_count >= process_limit
+        ):
+            break
+
+        patches = get_game_patches_for_processing(
+            limit=scan_page_size,
+            offset=offset,
         )
 
         if not patches:
@@ -461,18 +493,56 @@ def main() -> None:
             processed_count += 1
 
             if (
-                processed_count
-                >= process_limit
+                process_limit > 0
+                and processed_count >= process_limit
             ):
                 break
 
         offset += scan_page_size
+
+    result = {
+        "processed": processed_count,
+    }
 
     logger.info(
         "LLM processing finished "
         "processed=%s",
         processed_count,
     )
+
+    return result
+
+
+def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format=(
+            "%(asctime)s | "
+            "%(levelname)s | "
+            "%(message)s"
+        ),
+    )
+
+    process_limit = int(
+        os.getenv(
+            "PATCH_LLM_PROCESS_LIMIT",
+            "0",
+        )
+    )
+
+    scan_page_size = int(
+        os.getenv(
+            "PATCH_LLM_SCAN_PAGE_SIZE",
+            "50",
+        )
+    )
+
+    result = run_patch_llm_processing(
+        process_limit=process_limit,
+        scan_page_size=scan_page_size,
+    )
+
+    print(result)
 
 
 if __name__ == "__main__":

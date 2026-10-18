@@ -2,10 +2,16 @@ from math import ceil
 from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
-from fastapi import APIRouter, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Request,
+)
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-
+from fastapi.responses import (
+    RedirectResponse,
+)
 from game_data_platform.storage import (
     get_game,
     get_games,
@@ -26,6 +32,9 @@ from game_data_platform.web.presentation import (
     build_summary_items,
     format_patch_date,
     normalize_patch_title,
+)
+from game_data_platform.patch_llm_processor import (
+    process_patch_by_id,
 )
 
 KST = ZoneInfo("Asia/Seoul")
@@ -285,6 +294,11 @@ def patch_list(
                 ],
             )
         )
+        patch["summary_items"] = (
+            build_summary_items(
+                patch["summary"]
+            )
+        )
 
     games = get_patch_viewer_games()
 
@@ -437,8 +451,14 @@ def patch_detail(
         patch["summary"]
     )
 
+    cleaned_display_content = (
+        clean_patch_content(
+            patch["display_content"]
+        )
+    )
+
     content_blocks = build_patch_blocks(
-        patch["display_content"]
+        cleaned_display_content
     )
 
     cleaned_original_content = (
@@ -463,4 +483,36 @@ def patch_detail(
             "content_blocks": content_blocks,
             "original_blocks": original_blocks,
         },
+    )
+
+@router.post(
+    "/patches/{patch_id}/process"
+)
+def process_patch_from_web(
+    patch_id: int,
+    background_tasks: BackgroundTasks,
+    force: bool = False,
+):
+    patch = get_patch_viewer_detail(
+        patch_id
+    )
+
+    if patch is None:
+        return RedirectResponse(
+            url="/patches",
+            status_code=303,
+        )
+
+    background_tasks.add_task(
+        process_patch_by_id,
+        patch_id,
+        force,
+    )
+
+    return RedirectResponse(
+        url=(
+            f"/patches/{patch_id}"
+            "?processing_started=1"
+        ),
+        status_code=303,
     )
