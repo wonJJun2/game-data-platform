@@ -13,6 +13,7 @@ from fastapi.responses import (
     RedirectResponse,
 )
 from game_data_platform.storage import (
+    get_current_game_price,
     get_game,
     get_games,
     get_latest_player_count,
@@ -21,6 +22,7 @@ from game_data_platform.storage import (
     get_patch_viewer_detail,
     get_patch_viewer_games,
     get_patch_viewer_list,
+    get_game_price_history,
 )
 
 from game_data_platform.text_utils import (
@@ -110,6 +112,108 @@ def game_detail(
             game_id=game_id,
         )
     )
+    current_price = get_current_game_price(
+        game_id=game_id,
+    )
+    price_history = get_game_price_history(
+        game_id=game_id,
+        limit=100,
+        order="asc",
+    )
+    price_chart_data = []
+
+    for item in price_history:
+        if (
+            item["price_status"] != "priced"
+            or item["final_price"] is None
+        ):
+            continue
+
+        changed_at = item["changed_at"]
+
+        if changed_at is not None:
+            changed_at = (
+                changed_at
+                .astimezone(KST)
+                .isoformat()
+            )
+
+        price_chart_data.append(
+            {
+                "changed_at": changed_at,
+                "price": float(
+                    item["final_price"]
+                ),
+                "initial_price": (
+                    float(
+                        item["initial_price"]
+                    )
+                    if item["initial_price"]
+                    is not None
+                    else None
+                ),
+                "discount_percent": (
+                    item["discount_percent"]
+                ),
+            }
+        )
+    price_view = {
+        "status": "not_collected",
+        "label": "가격 정보 없음",
+        "final_price": None,
+        "initial_price": None,
+        "discount_percent": 0,
+        "checked_at": None,
+    }
+
+    if current_price is not None:
+        price_status = current_price[
+            "price_status"
+        ]
+
+        price_view["status"] = price_status
+        price_view["checked_at"] = (
+            current_price["checked_at"]
+        )
+
+        if price_status == "free":
+            price_view["label"] = "무료"
+
+        elif price_status == "priced":
+            final_price = current_price[
+                "final_price"
+            ]
+            initial_price = current_price[
+                "initial_price"
+            ]
+
+            price_view["final_price"] = (
+                f"{final_price:,.0f}"
+                if final_price is not None
+                else None
+            )
+
+            price_view["initial_price"] = (
+                f"{initial_price:,.0f}"
+                if initial_price is not None
+                else None
+            )
+
+            price_view["discount_percent"] = (
+                current_price[
+                    "discount_percent"
+                ]
+            )
+
+            if price_view["final_price"]:
+                price_view["label"] = (
+                    f"₩{price_view['final_price']}"
+                )
+
+        elif price_status == "unavailable":
+            price_view["label"] = (
+                "가격 정보 없음"
+            )
 
     player_counts = get_player_counts(
         game_id=game_id,
@@ -207,6 +311,9 @@ def game_detail(
             "latest_player_count": (
                 latest_player_count
             ),
+            "current_price": price_view,
+            "price_history": price_history,
+            "price_chart_data": price_chart_data,
             "player_counts": (
                 player_counts
             ),

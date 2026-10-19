@@ -56,29 +56,86 @@
             </div>
 
 
-            <div class="game-current-players">
+            <div class="game-hero-stats">
 
-                <span>
-                    현재 동접자
-                </span>
+                <div class="game-current-players">
 
-                {% if latest_player_count %}
+                    <span>
+                        현재 동접자
+                    </span>
+
+                    {% if latest_player_count %}
+
+                        <strong>
+                            {{
+                                "{:,}".format(
+                                    latest_player_count.player_count
+                                )
+                            }}
+                        </strong>
+
+                    {% else %}
+
+                        <strong>
+                            -
+                        </strong>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="game-current-price">
+
+                    <span>
+                        현재 가격
+                    </span>
 
                     <strong>
-                        {{
-                            "{:,}".format(
-                                latest_player_count.player_count
-                            )
-                        }}
+                        {{ current_price.label }}
                     </strong>
 
-                {% else %}
+                    {% if
+                        current_price.status == "priced"
+                        and current_price.discount_percent > 0
+                    %}
 
-                    <strong>
-                        -
-                    </strong>
+                        <div class="game-price-discount">
 
-                {% endif %}
+                            {% if current_price.initial_price %}
+
+                                <del>
+                                    ₩{{ current_price.initial_price }}
+                                </del>
+
+                            {% endif %}
+
+                            <em>
+                                {{ current_price.discount_percent }}% 할인
+                            </em>
+
+                        </div>
+
+                    {% elif current_price.status == "free" %}
+
+                        <small class="game-price-note">
+                            Free to Play
+                        </small>
+
+                    {% elif
+                        current_price.status in [
+                            "unavailable",
+                            "not_collected"
+                        ]
+                    %}
+
+                        <small class="game-price-note">
+                            Steam KR
+                        </small>
+
+                    {% endif %}
+
+                </div>
 
             </div>
 
@@ -180,6 +237,74 @@
             <div>
 
                 <p class="dashboard-section-label">
+                    PRICE HISTORY
+                </p>
+
+                <h2>
+                    가격 이력
+                </h2>
+
+            </div>
+
+
+            <span class="dashboard-section-meta">
+                Steam KR · 가격 변동 기준
+            </span>
+
+        </div>
+
+
+        {% if price_chart_data %}
+
+            <div class="price-chart-container">
+
+                <canvas
+                    id="priceHistoryChart"
+                    aria-label="가격 이력 차트"
+                ></canvas>
+
+            </div>
+
+
+            <script
+                id="priceChartData"
+                type="application/json"
+            >
+                {{ price_chart_data | tojson }}
+            </script>
+
+        {% else %}
+
+            <div class="dashboard-empty compact">
+
+                {% if current_price.status == "free" %}
+
+                    무료 게임입니다.
+
+                {% elif current_price.status == "unavailable" %}
+
+                    Steam에서 가격 정보를 제공하지 않습니다.
+
+                {% else %}
+
+                    아직 수집된 가격 이력이 없습니다.
+
+                {% endif %}
+
+            </div>
+
+        {% endif %}
+
+    </section>
+
+
+    <section class="dashboard-card">
+
+        <div class="dashboard-section-heading">
+
+            <div>
+
+                <p class="dashboard-section-label">
                     PATCH NOTES
                 </p>
 
@@ -195,9 +320,11 @@
                 href="/patches?game={{ game.name | urlencode }}"
             >
                 전체 보기
+
                 <span>
                     →
                 </span>
+
             </a>
 
         </div>
@@ -288,6 +415,7 @@
 
 
 <script>
+{
     const chartCanvas =
         document.getElementById(
             "playerCountChart"
@@ -638,6 +766,290 @@
             }
         );
     }
+}
+</script>
+
+
+<script>
+{
+    const priceChartCanvas =
+        document.getElementById(
+            "priceHistoryChart"
+        );
+
+    const priceChartDataElement =
+        document.getElementById(
+            "priceChartData"
+        );
+
+
+    if (
+        priceChartCanvas
+        && priceChartDataElement
+    ) {
+        const priceData =
+            JSON.parse(
+                priceChartDataElement.textContent
+            );
+
+
+        const styles =
+            getComputedStyle(
+                document.documentElement
+            );
+
+        const accent = styles
+            .getPropertyValue("--accent")
+            .trim();
+
+        const border = styles
+            .getPropertyValue("--border")
+            .trim();
+
+        const textSecondary = styles
+            .getPropertyValue(
+                "--text-secondary"
+            )
+            .trim();
+
+
+        const labels =
+            priceData.map(
+                (item) => {
+                    const date =
+                        new Date(
+                            item.changed_at
+                        );
+
+                    return (
+                        String(
+                            date.getMonth() + 1
+                        ).padStart(2, "0")
+                        + "/"
+                        + String(
+                            date.getDate()
+                        ).padStart(2, "0")
+                    );
+                }
+            );
+
+
+        const values =
+            priceData.map(
+                (item) =>
+                    item.price
+            );
+
+
+        new Chart(
+            priceChartCanvas,
+            {
+                type: "line",
+
+                data: {
+                    labels:
+                        labels,
+
+                    datasets: [
+                        {
+                            label:
+                                "가격",
+
+                            data:
+                                values,
+
+                            borderColor:
+                                accent,
+
+                            backgroundColor:
+                                accent,
+
+                            borderWidth:
+                                2,
+
+                            stepped:
+                                true,
+
+                            tension:
+                                0,
+
+                            fill:
+                                false,
+
+                            pointRadius:
+                                priceData.length === 1
+                                    ? 4
+                                    : 3,
+
+                            pointHoverRadius:
+                                6,
+
+                            pointHitRadius:
+                                16,
+                        },
+                    ],
+                },
+
+
+                options: {
+                    responsive:
+                        true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    interaction: {
+                        intersect:
+                            false,
+
+                        mode:
+                            "index",
+                    },
+
+
+                    plugins: {
+                        legend: {
+                            display:
+                                false,
+                        },
+
+
+                        tooltip: {
+                            displayColors:
+                                false,
+
+                            callbacks: {
+                                label(
+                                    context
+                                ) {
+                                    const item =
+                                        priceData[
+                                            context.dataIndex
+                                        ];
+
+                                    return (
+                                        "현재가 ₩"
+                                        + Number(
+                                            item.price
+                                        ).toLocaleString(
+                                            "ko-KR"
+                                        )
+                                    );
+                                },
+
+
+                                afterLabel(
+                                    context
+                                ) {
+                                    const item =
+                                        priceData[
+                                            context.dataIndex
+                                        ];
+
+                                    const lines =
+                                        [];
+
+
+                                    if (
+                                        item.initial_price
+                                        && item.initial_price
+                                            !== item.price
+                                    ) {
+                                        lines.push(
+                                            "정상가 ₩"
+                                            + Number(
+                                                item.initial_price
+                                            ).toLocaleString(
+                                                "ko-KR"
+                                            )
+                                        );
+                                    }
+
+
+                                    if (
+                                        item.discount_percent
+                                        > 0
+                                    ) {
+                                        lines.push(
+                                            item.discount_percent
+                                            + "% 할인"
+                                        );
+                                    }
+
+
+                                    return lines;
+                                },
+                            },
+                        },
+                    },
+
+
+                    scales: {
+                        x: {
+                            grid: {
+                                display:
+                                    false,
+                            },
+
+                            border: {
+                                display:
+                                    false,
+                            },
+
+                            ticks: {
+                                color:
+                                    textSecondary,
+
+                                maxTicksLimit:
+                                    7,
+
+                                maxRotation:
+                                    0,
+
+                                autoSkip:
+                                    true,
+                            },
+                        },
+
+
+                        y: {
+                            beginAtZero:
+                                false,
+
+                            border: {
+                                display:
+                                    false,
+                            },
+
+                            grid: {
+                                color:
+                                    border,
+                            },
+
+                            ticks: {
+                                color:
+                                    textSecondary,
+
+                                callback(
+                                    value
+                                ) {
+                                    return (
+                                        "₩"
+                                        + Number(
+                                            value
+                                        ).toLocaleString(
+                                            "ko-KR"
+                                        )
+                                    );
+                                },
+                            },
+                        },
+                    },
+                },
+            }
+        );
+    }
+}
 </script>
 
 {% endblock %}

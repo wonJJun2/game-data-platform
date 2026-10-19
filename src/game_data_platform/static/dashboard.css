@@ -541,12 +541,16 @@
         -0.04em;
 }
 
+.game-hero-stats {
+    display: flex;
+    align-items: center;
 
-.game-current-players {
-    flex:
-        0 0 auto;
+    flex: 0 0 auto;
+}
 
-    min-width: 180px;
+.game-current-players,
+.game-current-price {
+    min-width: 145px;
 
     padding-left: 28px;
 
@@ -558,7 +562,13 @@
 }
 
 
-.game-current-players span {
+.game-current-price {
+    margin-left: 28px;
+}
+
+
+.game-current-players span,
+.game-current-price > span {
     display: block;
 
     margin-bottom: 7px;
@@ -570,7 +580,8 @@
 }
 
 
-.game-current-players strong {
+.game-current-players strong,
+.game-current-price > strong {
     display: block;
 
     font-size: 28px;
@@ -582,6 +593,44 @@
         -0.04em;
 }
 
+.game-price-discount {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: 8px;
+
+    margin-top: 7px;
+
+    font-size: 11px;
+}
+
+
+.game-price-discount del {
+    color:
+        var(--text-light);
+}
+
+
+.game-price-discount em {
+    font-style: normal;
+    font-weight: 700;
+
+    color:
+        var(--accent);
+}
+
+
+.game-price-note {
+    display: block;
+
+    margin-top: 7px;
+
+    font-size: 11px;
+
+    color:
+        var(--text-secondary);
+}
 
 
 /* ========================================
@@ -752,7 +801,14 @@
     margin-top: 6px;
 }
 
+.price-chart-container {
+    position: relative;
 
+    width: 100%;
+    height: 280px;
+
+    margin-top: 6px;
+}
 
 /* ========================================
    Recent patches
@@ -1043,25 +1099,49 @@
     }
 
 
-    .game-current-players {
-        min-width: 0;
+    .game-hero-stats {
+        width: 100%;
 
-        padding:
-            18px
-            0
-            0;
-
-        border-left: 0;
+        padding-top: 18px;
 
         border-top:
             1px solid
             var(--border);
+    }
+
+
+    .game-current-players,
+    .game-current-price {
+        flex: 1;
+
+        min-width: 0;
+
+        padding: 0;
+
+        border-left: 0;
 
         text-align: left;
     }
 
 
-    .game-current-players strong {
+    .game-current-price {
+        margin-left: 24px;
+
+        padding-left: 24px;
+
+        border-left:
+            1px solid
+            var(--border);
+    }
+
+
+    .game-price-discount {
+        justify-content: flex-start;
+    }
+
+
+    .game-current-players strong,
+    .game-current-price > strong {
         font-size: 25px;
     }
 
@@ -1088,6 +1168,9 @@
         height: 260px;
     }
 
+    .price-chart-container {
+        height: 240px;
+    }
 
     .game-patch-item {
         gap: 18px;
