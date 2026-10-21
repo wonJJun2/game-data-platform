@@ -44,6 +44,153 @@
 
     </section>
 
+        <section class="game-register-card">
+
+        <div class="game-register-heading">
+
+            <div>
+
+                <p class="dashboard-section-label">
+                    ADD GAME
+                </p>
+
+                <h2>
+                    Steam 게임 추가
+                </h2>
+
+                <p>
+                    Steam Store 게임 URL을 붙여넣어
+                    게임 정보를 확인합니다.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <form
+            class="game-register-form"
+            method="get"
+            action="/games"
+        >
+
+            <input
+                class="game-register-input"
+                type="url"
+                name="steam_url"
+                value="{{ steam_url }}"
+                placeholder="https://store.steampowered.com/app/..."
+                required
+            >
+
+            <button
+                class="game-register-submit"
+                type="submit"
+            >
+                게임 확인
+            </button>
+
+        </form>
+
+
+        {% if registration_error %}
+
+            <div class="game-register-error">
+                {{ registration_error }}
+            </div>
+
+        {% endif %}
+
+
+        {% if registration_preview %}
+
+            <div class="game-register-preview">
+
+                <div class="game-register-preview-image">
+
+                    {% if registration_preview.header_image_url %}
+
+                        <img
+                            src="{{
+                                registration_preview.header_image_url
+                            }}"
+                            alt="{{
+                                registration_preview.name
+                            }}"
+                        >
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="game-register-preview-content">
+
+                    <span class="game-register-preview-label">
+                        Steam App ID
+                        {{
+                            registration_preview.steam_app_id
+                        }}
+                    </span>
+
+                    <h3>
+                        {{ registration_preview.name }}
+                    </h3>
+
+
+                    {% if registration_preview.already_registered %}
+
+                        <p class="game-register-status registered">
+                            이미 등록된 게임입니다.
+                        </p>
+
+                        <a
+                            class="game-register-detail-link"
+                            href="/games/{{
+                                registration_preview.existing_game_id
+                            }}"
+                        >
+                            게임 상세 보기
+                            <span>
+                                →
+                            </span>
+                        </a>
+
+                    {% else %}
+
+                        <p class="game-register-status available">
+                            등록할 수 있는 게임입니다.
+                        </p>
+
+                        <form
+                            method="post"
+                            action="/games/register"
+                        >
+                            <input
+                                type="hidden"
+                                name="steam_app_id"
+                                value="{{
+                                    registration_preview.steam_app_id
+                                }}"
+                            >
+
+                            <button
+                                class="game-register-button"
+                                type="submit"
+                            >
+                                게임 추가
+                            </button>
+                        </form>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+    </section>
 
     {% if games %}
 

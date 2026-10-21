@@ -1038,6 +1038,246 @@
 
 }
 
+/* ========================================
+   Game registration
+======================================== */
+
+.game-register-card {
+    margin-bottom: 28px;
+    padding: 26px 28px;
+
+    background:
+        var(--surface);
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 18px;
+}
+
+
+.game-register-heading h2 {
+    margin:
+        4px 0 8px;
+
+    font-size: 20px;
+    font-weight: 750;
+
+    letter-spacing:
+        -0.025em;
+}
+
+
+.game-register-heading p:last-child {
+    margin: 0;
+
+    font-size: 13px;
+    line-height: 1.6;
+
+    color:
+        var(--text-secondary);
+}
+
+
+.game-register-form {
+    display: flex;
+
+    gap: 10px;
+
+    margin-top: 22px;
+}
+
+
+.game-register-input {
+    min-width: 0;
+
+    flex: 1;
+
+    height: 44px;
+
+    padding:
+        0 14px;
+
+    border:
+        1px solid
+        var(--border-strong);
+
+    border-radius: 10px;
+
+    background:
+        var(--surface);
+
+    color:
+        var(--text);
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.game-register-input:focus {
+    border-color:
+        var(--accent);
+}
+
+
+.game-register-submit,
+.game-register-button {
+    height: 44px;
+
+    padding:
+        0 18px;
+
+    border: 0;
+
+    border-radius: 10px;
+
+    background:
+        var(--accent);
+
+    color: #ffffff;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.game-register-button:disabled {
+    opacity: 0.45;
+
+    cursor:
+        not-allowed;
+}
+
+
+.game-register-error {
+    margin-top: 16px;
+
+    padding:
+        12px 14px;
+
+    border-radius: 10px;
+
+    background:
+        #fff2f0;
+
+    font-size: 13px;
+
+    color:
+        #b42318;
+}
+
+
+.game-register-preview {
+    display: grid;
+
+    grid-template-columns:
+        230px
+        minmax(0, 1fr);
+
+    gap: 22px;
+
+    margin-top: 20px;
+    padding-top: 20px;
+
+    border-top:
+        1px solid
+        var(--border);
+}
+
+
+.game-register-preview-image {
+    position: relative;
+
+    aspect-ratio:
+        460 / 215;
+
+    overflow: hidden;
+
+    border-radius: 12px;
+
+    background:
+        var(--surface-soft);
+}
+
+
+.game-register-preview-image img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+
+.game-register-preview-content {
+    display: flex;
+
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+
+    min-width: 0;
+}
+
+
+.game-register-preview-label {
+    font-size: 11px;
+    font-weight: 650;
+
+    color:
+        var(--text-secondary);
+}
+
+
+.game-register-preview-content h3 {
+    margin:
+        6px 0 10px;
+
+    font-size: 21px;
+    font-weight: 750;
+
+    letter-spacing:
+        -0.025em;
+}
+
+
+.game-register-status {
+    margin:
+        0 0 14px;
+
+    font-size: 13px;
+}
+
+
+.game-register-status.registered {
+    color:
+        var(--text-secondary);
+}
+
+
+.game-register-status.available {
+    color:
+        var(--success-text);
+}
+
+
+.game-register-detail-link {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    color:
+        var(--accent);
+}
 
 
 /* ========================================
@@ -1180,5 +1420,21 @@
     .game-patch-item p {
         -webkit-line-clamp: 2;
         line-clamp: 2;
+    }
+
+        .game-register-form {
+    flex-direction:
+        column;
+    }
+
+
+    .game-register-submit {
+        width: 100%;
+    }
+
+
+    .game-register-preview {
+        grid-template-columns:
+            1fr;
     }
 }
