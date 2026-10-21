@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Form,
     Request,
 )
 from fastapi.responses import HTMLResponse
@@ -23,6 +24,15 @@ from game_data_platform.storage import (
     get_patch_viewer_games,
     get_patch_viewer_list,
     get_game_price_history,
+)
+
+from game_data_platform.services.game_service import (
+    GameAlreadyRegisteredError,
+    InvalidSteamStoreUrlError,
+    SteamGameLookupError,
+    SteamGameNotFoundError,
+    get_game_registration_preview,
+    register_game,
 )
 
 from game_data_platform.text_utils import (
@@ -56,6 +66,7 @@ templates = Jinja2Templates(
 )
 def game_list(
     request: Request,
+    steam_url: str | None = None,
 ):
     games = get_games()
 
@@ -70,6 +81,27 @@ def game_list(
             latest_player_count
         )
 
+
+    registration_preview = None
+    registration_error = None
+
+
+    if steam_url:
+        try:
+            registration_preview = (
+                get_game_registration_preview(
+                    steam_url
+                )
+            )
+
+        except (
+            InvalidSteamStoreUrlError,
+            SteamGameNotFoundError,
+            SteamGameLookupError,
+        ) as exc:
+            registration_error = str(exc)
+
+
     return templates.TemplateResponse(
         request=request,
         name="games.html",
@@ -79,7 +111,44 @@ def game_list(
             ),
             "games": games,
             "total_count": len(games),
+            "steam_url": steam_url or "",
+            "registration_preview":
+                registration_preview,
+            "registration_error":
+                registration_error,
         },
+    )
+
+@router.post(
+    "/games/register",
+)
+def register_game_route(
+    steam_app_id: int = Form(...),
+):
+    try:
+        game = register_game(
+            steam_app_id=steam_app_id,
+        )
+
+    except GameAlreadyRegisteredError as exc:
+        return RedirectResponse(
+            url=f"/games/{exc.game_id}",
+            status_code=303,
+        )
+
+    except (
+        SteamGameNotFoundError,
+        SteamGameLookupError,
+    ):
+        return RedirectResponse(
+            url="/games",
+            status_code=303,
+        )
+
+
+    return RedirectResponse(
+        url=f"/games/{game['game_id']}",
+        status_code=303,
     )
 
 @router.get(

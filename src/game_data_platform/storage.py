@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from psycopg.rows import dict_row
 
 from game_data_platform.database import get_connection
@@ -649,6 +650,36 @@ def get_game_by_steam_app_id(
         "steam_app_id": row[1],
         "name": row[2],
     }
+
+def create_game(
+    *,
+    steam_app_id: int,
+    name: str,
+    header_image_url: str | None,
+) -> dict:
+    game = Game(
+        steam_app_id=steam_app_id,
+        name=name,
+        created_at=datetime.now(
+            timezone.utc
+        ),
+        genre=None,
+        header_image_url=header_image_url,
+    )
+
+    with SessionLocal() as session:
+        session.add(game)
+        session.commit()
+        session.refresh(game)
+
+        return {
+            "game_id": game.game_id,
+            "steam_app_id": game.steam_app_id,
+            "name": game.name,
+            "created_at": game.created_at,
+            "header_image_url":
+                game.header_image_url,
+        }
 
 def save_game_price(
     data: dict,
