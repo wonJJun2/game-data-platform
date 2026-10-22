@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+import httpx
 import pendulum
 
 from airflow.exceptions import AirflowSkipException
@@ -42,6 +43,16 @@ def player_count_collection():
     def collect_one_game(game: dict):
         try:
             collect_game(game)
+
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise AirflowSkipException(
+                    f"{game['name']} "
+                    f"({game['steam_app_id']}): "
+                    "player count unavailable"
+                ) from exc
+
+            raise
 
         except ValueError as exc:
             raise AirflowSkipException(

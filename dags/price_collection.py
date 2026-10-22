@@ -1,5 +1,8 @@
-from airflow.sdk import dag, task
+from datetime import timedelta
+
 import pendulum
+
+from airflow.sdk import dag, task
 
 from game_data_platform.price_collector import (
     collect_game_prices,
@@ -24,7 +27,10 @@ from game_data_platform.price_collector import (
 )
 def price_collection():
 
-    @task
+    @task(
+        retries=2,
+        retry_delay=timedelta(seconds=30),
+    )
     def collect_prices():
         result = collect_game_prices(
             country_code="KR",
@@ -34,6 +40,12 @@ def price_collection():
             "Price collection result:",
             result,
         )
+
+        if result["retryable_failed"] > 0:
+            raise RuntimeError(
+                "Retryable price collection failures: "
+                f"{result['retryable_failed']}"
+            )
 
         return result
 

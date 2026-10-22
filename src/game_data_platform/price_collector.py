@@ -1,6 +1,7 @@
 import logging
 
 import httpx
+import psycopg
 
 from game_data_platform.steam_price import (
     get_steam_price,
@@ -23,6 +24,8 @@ def collect_game_prices(
         "total": len(games),
         "success": 0,
         "failed": 0,
+        "skipped": 0,
+        "retryable_failed": 0,
         "created": 0,
         "changed": 0,
         "checked": 0,
@@ -65,6 +68,7 @@ def collect_game_prices(
 
         except httpx.TimeoutException:
             result["failed"] += 1
+            result["retryable_failed"] += 1
 
             logger.exception(
                 "Steam price timeout | "
@@ -75,6 +79,11 @@ def collect_game_prices(
 
         except httpx.HTTPStatusError as error:
             result["failed"] += 1
+
+            if error.response.status_code == 404:
+                result["skipped"] += 1
+            else:
+                result["retryable_failed"] += 1
 
             logger.exception(
                 "Steam price HTTP error | "
@@ -88,6 +97,7 @@ def collect_game_prices(
 
         except httpx.RequestError:
             result["failed"] += 1
+            result["retryable_failed"] += 1
 
             logger.exception(
                 "Steam price request error | "
@@ -98,6 +108,7 @@ def collect_game_prices(
 
         except ValueError:
             result["failed"] += 1
+            result["skipped"] += 1
 
             logger.exception(
                 "Steam price data error | "
@@ -106,8 +117,20 @@ def collect_game_prices(
                 steam_app_id,
             )
 
+        except psycopg.Error:
+            result["failed"] += 1
+            result["retryable_failed"] += 1
+
+            logger.exception(
+                "Price DB error | "
+                "game=%s | app_id=%s",
+                game_name,
+                steam_app_id,
+            )
+
         except Exception:
             result["failed"] += 1
+            result["retryable_failed"] += 1
 
             logger.exception(
                 "Unexpected price collector error | "
