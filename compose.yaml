@@ -15,6 +15,7 @@ services:
         condition: service_healthy
 
   patch-init:
+    profiles: ["manual"]
     build: .
     container_name: game-data-patch-init
     env_file:
@@ -161,6 +162,11 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+
+       # Patch LLM processing
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      LLM_MODEL: ${LLM_MODEL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
 
     command: scheduler
 

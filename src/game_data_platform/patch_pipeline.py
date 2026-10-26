@@ -21,7 +21,9 @@ from game_data_platform.patch_llm_processor import (
 logger = logging.getLogger(__name__)
 
 
-def run_patch_pipeline() -> dict:
+def run_patch_pipeline(
+    llm_process_limit: int = 0,
+) -> dict:
     games = get_games()
 
     # 1. Steam News 수집
@@ -49,7 +51,7 @@ def run_patch_pipeline() -> dict:
 
     # 6. 신규/변경 패치 번역 및 요약
     llm_processing = run_patch_llm_processing(
-        process_limit=0,
+        process_limit=llm_process_limit,
     )
 
     result = {
