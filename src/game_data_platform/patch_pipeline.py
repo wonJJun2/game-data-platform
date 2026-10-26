@@ -3,6 +3,7 @@ import logging
 from game_data_platform.storage import get_games
 from game_data_platform.news_collector import collect_news
 from game_data_platform.overwatch_collector import (
+    LOCALES,
     collect_overwatch_patch_notes,
 )
 from game_data_platform.pubg_collector import (
@@ -54,6 +55,16 @@ def run_patch_pipeline(
         process_limit=llm_process_limit,
     )
 
+    # Collector별 수집 실패 건수 집계
+    collection_failures = {
+        "steam": len(games) - len(steam_collection),
+        "pubg": pubg_collection["failed"],
+        "overwatch": (
+            len(LOCALES)
+            - len(overwatch_collection["locales"])
+        ),
+    }
+
     result = {
         "steam_collection": steam_collection,
         "steam_detection": steam_detection,
@@ -61,6 +72,7 @@ def run_patch_pipeline(
         "overwatch_collection": overwatch_collection,
         "patch_sync": patch_sync,
         "llm_processing": llm_processing,
+        "collection_failures": collection_failures,
     }
 
     logger.info(

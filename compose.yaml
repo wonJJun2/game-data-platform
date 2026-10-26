@@ -163,10 +163,11 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
 
-       # Patch LLM processing
+      # Patch LLM processing
       LLM_PROVIDER: ${LLM_PROVIDER}
       LLM_MODEL: ${LLM_MODEL}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PATCH_LLM_PROCESS_LIMIT: "3"
 
     command: scheduler
 
