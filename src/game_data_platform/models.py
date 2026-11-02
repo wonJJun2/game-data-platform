@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     Numeric,
@@ -675,5 +676,45 @@ class GamePatchProcessing(Base):
             "patch_id",
             "target_language",
             name="uq_game_patch_processing_target",
+        ),
+    )
+
+class DiscordGameSubscription(Base):
+    __tablename__ = "discord_game_subscriptions"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        primary_key=True,
+    )
+
+    guild_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    discord_user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id"),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "guild_id",
+            "discord_user_id",
+            "game_id",
+            name="uq_discord_game_subscriptions_guild_user_game",
         ),
     )
