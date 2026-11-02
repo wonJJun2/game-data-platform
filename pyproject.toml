@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
     "beautifulsoup4>=4.15.0",
+    "discord-py>=2.7,<3",
     "fastapi>=0.141.1",
     "google-genai>=2.29.0",
     "httpx>=0.28.1",
@@ -25,6 +26,7 @@ game-data-news = "game_data_platform.news_pipeline:main"
 game-data-patches = "game_data_platform.patch_pipeline:main"
 game-data-patch-llm = "game_data_platform.patch_llm_processor:main"
 game-data-price = "game_data_platform.price_collector:main"
+game-data-discord = "game_data_platform.discord_bot:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
