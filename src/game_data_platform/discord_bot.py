@@ -13,6 +13,9 @@ from game_data_platform.discord_subscription_service import (
     unsubscribe_game,
     get_subscribed_games,
 )
+from game_data_platform.discord_notification_dispatcher import (
+    dispatch_one_notification,
+)
 
 load_dotenv()
 
@@ -25,6 +28,7 @@ class GameDataBot(discord.Client):
         super().__init__(intents=intents)
 
         self.tree = app_commands.CommandTree(self)
+        self.notification_task: asyncio.Task | None = None
 
     async def setup_hook(self):
         # 개발 중에는 테스트 서버에만 명령어 등록
@@ -37,9 +41,59 @@ class GameDataBot(discord.Client):
 
         print(f"Slash commands registered: {len(synced)}")
 
+        if os.getenv(
+            "DISCORD_NOTIFICATION_WORKER_ENABLED", "0"
+        ) == "1":
+            self.notification_task = asyncio.create_task(
+                self.notification_loop(),
+                name="discord-notification-worker",
+            )
+            logger.info("Notification worker task created")
+        else:
+            logger.info("Notification worker disabled")
     async def on_ready(self):
         print(f"Discord Bot connected: {self.user}")
 
+    async def notification_loop(self) -> None:
+        """10초마다 Outbox 알림 최대 1건을 처리한다."""
+
+        # Discord 연결 준비가 끝날 때까지 대기
+        await self.wait_until_ready()
+
+        logger.info("Discord notification worker started")
+
+        while not self.is_closed():
+            try:
+                result = await dispatch_one_notification(self)
+
+                if result != "empty":
+                    logger.info(
+                        "Notification dispatch result: %s",
+                        result,
+                    )
+
+            except asyncio.CancelledError:
+                raise
+
+            except Exception:
+                logger.exception(
+                    "Notification worker iteration failed"
+                )
+
+            await asyncio.sleep(10)
+
+    async def close(self) -> None:
+        """Bot 종료 시 백그라운드 Worker도 종료한다."""
+
+        if self.notification_task is not None:
+            self.notification_task.cancel()
+
+            try:
+                await self.notification_task
+            except asyncio.CancelledError:
+                pass
+
+        await super().close()
 
 bot = GameDataBot()
 
