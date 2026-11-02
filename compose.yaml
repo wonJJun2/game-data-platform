@@ -29,6 +29,22 @@ services:
     command: uv run --no-dev game-data-patches
     restart: "no"
 
+  discord-bot:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: game-data-discord-bot
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uv run --no-dev game-data-discord
+    restart: unless-stopped
+
   price-init:
     build: .
     container_name: game-data-price-init
