@@ -16,6 +16,13 @@ from game_data_platform.discord_subscription_service import (
 from game_data_platform.discord_notification_dispatcher import (
     dispatch_one_notification,
 )
+from game_data_platform.discord_patch_subscription_service import (
+    set_patch_channel,
+    get_patch_channel,
+    subscribe_patch_game,
+    unsubscribe_patch_game,
+    get_subscribed_patch_games,
+)
 
 load_dotenv()
 
@@ -105,6 +112,402 @@ bot = GameDataBot()
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(
         "Pong! 🏓",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="patch-channel",
+    description="서버의 공용 패치 알림 채널을 설정합니다.",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(
+    channel="패치 알림을 받을 텍스트 채널",
+)
+async def patch_channel(
+    interaction: discord.Interaction,
+    channel: discord.TextChannel,
+):
+    # 1. 서버 내에서만 실행
+    if interaction.guild is None or interaction.guild_id is None:
+        await interaction.response.send_message(
+            "서버에서만 사용할 수 있는 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 2. 서버 관리 권한 확인
+    member = interaction.user
+
+    if not isinstance(member, discord.Member) or not (
+        member.guild_permissions.manage_guild
+        or member.guild_permissions.administrator
+    ):
+        await interaction.response.send_message(
+            "서버 관리 권한이 필요한 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 3. Bot의 채널 접근 및 메시지 전송 권한 확인
+    bot_member = interaction.guild.me
+
+    if bot_member is None:
+        await interaction.response.send_message(
+            "Bot의 서버 권한 정보를 확인할 수 없습니다.",
+            ephemeral=True,
+        )
+        return
+
+    permissions = channel.permissions_for(bot_member)
+
+    if not (
+        permissions.view_channel
+        and permissions.send_messages
+    ):
+        await interaction.response.send_message(
+            "선택한 채널에 Bot의 채널 보기 및 "
+            "메시지 전송 권한이 필요합니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 4. DB 작업 전에 Discord 응답 예약
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        changed = await asyncio.to_thread(
+            set_patch_channel,
+            interaction.guild_id,
+            channel.id,
+        )
+
+    except Exception:
+        logger.exception("Patch channel setting DB error")
+
+        await interaction.followup.send(
+            "패치 알림 채널을 설정하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 5. 등록 또는 변경 결과 응답
+    if changed:
+        message = (
+            f"✅ 패치 알림 채널이 {channel.mention}(으)로 "
+            "설정되었습니다."
+        )
+    else:
+        message = (
+            f"ℹ️ {channel.mention}은(는) "
+            "이미 패치 알림 채널로 설정되어 있습니다."
+        )
+
+    await interaction.followup.send(
+        message,
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="patch-subscribe",
+    description="서버의 공용 패치 알림 게임을 구독합니다.",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(game="패치 알림을 구독할 게임")
+@app_commands.choices(
+    game=[
+        app_commands.Choice(
+            name="Overwatch",
+            value=2357570,
+        ),
+        app_commands.Choice(
+            name="PUBG: BATTLEGROUNDS",
+            value=578080,
+        ),
+    ]
+)
+async def patch_subscribe(
+    interaction: discord.Interaction,
+    game: app_commands.Choice[int],
+):
+    # 1. 서버에서만 실행
+    if interaction.guild_id is None:
+        await interaction.response.send_message(
+            "서버에서만 사용할 수 있는 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 2. 서버 관리 권한 확인
+    member = interaction.user
+
+    if not isinstance(member, discord.Member) or not (
+        member.guild_permissions.manage_guild
+        or member.guild_permissions.administrator
+    ):
+        await interaction.response.send_message(
+            "서버 관리 권한이 필요한 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        # 3. 패치 채널 설정 여부 확인
+        channel_id = await asyncio.to_thread(
+            get_patch_channel,
+            interaction.guild_id,
+        )
+
+        if channel_id is None:
+            await interaction.followup.send(
+                "패치 알림 채널이 설정되지 않았습니다. "
+                "먼저 /patch-channel 명령어를 실행해 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        # 4. Steam App ID로 실제 DB game_id 확인
+        games = await asyncio.to_thread(get_games)
+
+        selected = next(
+            (
+                item
+                for item in games
+                if item["steam_app_id"] == game.value
+            ),
+            None,
+        )
+
+        if selected is None:
+            await interaction.followup.send(
+                "선택한 게임이 DB에 등록되어 있지 않습니다.",
+                ephemeral=True,
+            )
+            return
+
+        # 5. 서버 단위 구독 등록
+        created = await asyncio.to_thread(
+            subscribe_patch_game,
+            interaction.guild_id,
+            selected["game_id"],
+        )
+
+    except Exception:
+        logger.exception("Patch game subscription error")
+
+        await interaction.followup.send(
+            "패치 알림 게임을 구독하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    safe_name = discord.utils.escape_mentions(
+        discord.utils.escape_markdown(selected["name"])
+    )
+
+    if created:
+        message = (
+            f"✅ **{safe_name}** 패치 알림을 구독했습니다."
+        )
+    else:
+        message = (
+            f"ℹ️ **{safe_name}**은(는) 이미 구독 중입니다."
+        )
+
+    await interaction.followup.send(
+        message,
+        ephemeral=True,
+    )
+
+@bot.tree.command(
+    name="patch-unsubscribe",
+    description="서버의 공용 패치 알림 게임 구독을 해제합니다.",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(game="구독을 해제할 게임")
+@app_commands.choices(
+    game=[
+        app_commands.Choice(
+            name="Overwatch",
+            value=2357570,
+        ),
+        app_commands.Choice(
+            name="PUBG: BATTLEGROUNDS",
+            value=578080,
+        ),
+    ]
+)
+async def patch_unsubscribe(
+    interaction: discord.Interaction,
+    game: app_commands.Choice[int],
+):
+    # 1. 서버에서만 실행
+    if interaction.guild_id is None:
+        await interaction.response.send_message(
+            "서버에서만 사용할 수 있는 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 2. 서버 관리 권한 확인
+    member = interaction.user
+
+    if not isinstance(member, discord.Member) or not (
+        member.guild_permissions.manage_guild
+        or member.guild_permissions.administrator
+    ):
+        await interaction.response.send_message(
+            "서버 관리 권한이 필요한 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        # 3. Steam App ID로 실제 DB game_id 조회
+        games = await asyncio.to_thread(get_games)
+
+        selected = next(
+            (
+                item
+                for item in games
+                if item["steam_app_id"] == game.value
+            ),
+            None,
+        )
+
+        if selected is None:
+            await interaction.followup.send(
+                "선택한 게임이 DB에 등록되어 있지 않습니다.",
+                ephemeral=True,
+            )
+            return
+
+        # 4. 서버 단위 구독 해제
+        deleted = await asyncio.to_thread(
+            unsubscribe_patch_game,
+            interaction.guild_id,
+            selected["game_id"],
+        )
+
+    except Exception:
+        logger.exception("Patch game unsubscribe error")
+
+        await interaction.followup.send(
+            "패치 알림 구독을 해제하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    safe_name = discord.utils.escape_mentions(
+        discord.utils.escape_markdown(selected["name"])
+    )
+
+    if deleted:
+        message = (
+            f"✅ **{safe_name}** 패치 알림 구독을 해제했습니다."
+        )
+    else:
+        message = (
+            f"ℹ️ **{safe_name}**은(는) 현재 구독 중이지 않습니다."
+        )
+
+    await interaction.followup.send(
+        message,
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="patch-subscriptions",
+    description="서버의 패치 알림 게임 구독 목록을 확인합니다.",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+async def patch_subscriptions(
+    interaction: discord.Interaction,
+):
+    # 1. 서버에서만 실행
+    if interaction.guild_id is None:
+        await interaction.response.send_message(
+            "서버에서만 사용할 수 있는 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 2. 서버 관리 권한 확인
+    member = interaction.user
+
+    if not isinstance(member, discord.Member) or not (
+        member.guild_permissions.manage_guild
+        or member.guild_permissions.administrator
+    ):
+        await interaction.response.send_message(
+            "서버 관리 권한이 필요한 명령어입니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 3. DB 조회 전에 응답 예약
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        games = await asyncio.to_thread(
+            get_subscribed_patch_games,
+            interaction.guild_id,
+        )
+
+    except Exception:
+        logger.exception("Patch subscriptions lookup error")
+
+        await interaction.followup.send(
+            "패치 알림 구독 목록을 조회하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 4. 구독 중인 게임이 없는 경우
+    if not games:
+        await interaction.followup.send(
+            "현재 서버에서 구독 중인 패치 알림 게임이 없습니다.",
+            ephemeral=True,
+        )
+        return
+
+    # 5. 게임 이름을 안전하게 표시
+    lines = [
+        "🎮 " + discord.utils.escape_mentions(
+            discord.utils.escape_markdown(game["name"])
+        )
+        for game in games
+    ]
+
+    message = (
+        f"**현재 서버의 패치 알림 구독 목록 ({len(games)}개)**\n\n"
+        + "\n".join(lines)
+    )
+
+    await interaction.followup.send(
+        message,
         ephemeral=True,
     )
 
