@@ -790,3 +790,68 @@ class PatchNotificationOutbox(Base):
             "created_at",
         ),
     )
+
+
+class DiscordPatchChannel(Base):
+    __tablename__ = "discord_patch_channels"
+
+    guild_id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class DiscordPatchGameSubscription(Base):
+    __tablename__ = "discord_patch_game_subscriptions"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        primary_key=True,
+    )
+
+    guild_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "discord_patch_channels.guild_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id"),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "guild_id",
+            "game_id",
+            name="uq_discord_patch_game_subscriptions_guild_game",
+        ),
+    )
