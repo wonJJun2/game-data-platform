@@ -855,3 +855,87 @@ class DiscordPatchGameSubscription(Base):
             name="uq_discord_patch_game_subscriptions_guild_game",
         ),
     )
+
+    start_after_patch_id: Mapped[int | None] = mapped_column(
+    BigInteger,
+    nullable=True,
+    )
+
+class DiscordPatchNotificationOutbox(Base):
+    __tablename__ = "discord_patch_notification_outbox"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        primary_key=True,
+    )
+
+    patch_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "game_patches.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    guild_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "discord_patch_channels.guild_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        server_default="pending",
+        nullable=False,
+    )
+
+    attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        server_default="0",
+        nullable=False,
+    )
+
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "patch_id",
+            "guild_id",
+            name="uq_discord_patch_notification_outbox_patch_guild",
+        ),
+        Index(
+            "ix_discord_patch_notification_outbox_ready",
+            "status",
+            "next_attempt_at",
+        ),
+    )

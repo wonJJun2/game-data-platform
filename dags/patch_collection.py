@@ -7,6 +7,9 @@ from airflow.sdk import dag, task
 from game_data_platform.patch_pipeline import (
     run_patch_pipeline,
 )
+from game_data_platform.discord_patch_notification_service import (
+    enqueue_pending_patch_notifications,
+)
 
 def check_collection_failures(result: dict) -> None:
     failures = result["collection_failures"]
@@ -55,7 +58,25 @@ def patch_collection():
 
         check_collection_failures(result)
 
-    collect_patches()
+    @task(
+        retries=2,
+        retry_delay=timedelta(minutes=5),
+    )
+    def enqueue_patch_notifications():
+        result = enqueue_pending_patch_notifications(
+            batch_size=100,
+        )
 
+        print(
+            "Patch notification outbox result:",
+            result,
+        )
+
+        return result
+
+    collection_task = collect_patches()
+    notification_task = enqueue_patch_notifications()
+
+    collection_task >> notification_task
 
 patch_collection()
