@@ -7,6 +7,7 @@ from game_data_platform.models import (
     DiscordPatchChannel,
     DiscordPatchGameSubscription,
     Game,
+    GamePatch,
 )
 
 
@@ -54,6 +55,7 @@ SUPPORTED_PATCH_APP_IDS = frozenset({
 })
 
 
+
 def subscribe_patch_game(
     guild_id: int,
     game_id: int,
@@ -61,11 +63,11 @@ def subscribe_patch_game(
     """서버의 패치 알림 게임 구독 등록.
 
     신규 등록이면 True, 중복이면 False.
-    현재 Overwatch와 PUBG만 허용.
+    신규 구독에는 현재 최대 패치 ID를 시작 기준으로 저장.
     """
 
     with SessionLocal.begin() as session:
-        # 게임 존재 여부와 지원 대상 확인
+        # 1. 지원 게임인지 확인
         steam_app_id = session.execute(
             select(Game.steam_app_id).where(
                 Game.game_id == game_id
@@ -77,12 +79,23 @@ def subscribe_patch_game(
                 "패치 알림은 현재 Overwatch와 PUBG만 지원합니다."
             )
 
-        # 서버 단위 게임 구독 등록
+        # 2. 현재 최대 패치 ID 조회
+        start_after_patch_id = session.execute(
+            select(
+                func.coalesce(
+                    func.max(GamePatch.id),
+                    0,
+                )
+            )
+        ).scalar_one()
+
+        # 3. 구독과 시작 기준을 함께 저장
         statement = (
             insert(DiscordPatchGameSubscription)
             .values(
                 guild_id=guild_id,
                 game_id=game_id,
+                start_after_patch_id=start_after_patch_id,
             )
             .on_conflict_do_nothing(
                 constraint=(
@@ -97,6 +110,7 @@ def subscribe_patch_game(
         ).scalar_one_or_none()
 
     return inserted_id is not None
+
 
 def unsubscribe_patch_game(
     guild_id: int,
