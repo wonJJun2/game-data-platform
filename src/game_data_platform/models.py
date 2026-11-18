@@ -756,6 +756,12 @@ class PatchNotificationOutbox(Base):
         server_default="0",
     )
 
+    delivery_attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        server_default="0",
+        nullable=False,
+    )
+
     next_attempt_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -895,6 +901,12 @@ class DiscordPatchNotificationOutbox(Base):
     )
 
     attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        server_default="0",
+        nullable=False,
+    )
+
+    delivery_attempt_count: Mapped[int] = mapped_column(
         Integer,
         server_default="0",
         nullable=False,
