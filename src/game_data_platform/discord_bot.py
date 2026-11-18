@@ -16,6 +16,9 @@ from game_data_platform.discord_subscription_service import (
 from game_data_platform.discord_notification_dispatcher import (
     dispatch_one_notification,
 )
+from game_data_platform.discord_patch_notification_dispatcher import (
+    dispatch_one_patch_notification,
+)
 from game_data_platform.discord_patch_subscription_service import (
     set_patch_channel,
     get_patch_channel,
@@ -28,6 +31,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class GameDataBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -35,7 +39,12 @@ class GameDataBot(discord.Client):
         super().__init__(intents=intents)
 
         self.tree = app_commands.CommandTree(self)
+
+        # 개인 DM 알림 Worker
         self.notification_task: asyncio.Task | None = None
+
+        # 서버 채널 패치노트 알림 Worker
+        self.patch_notification_task: asyncio.Task | None = None
 
     async def setup_hook(self):
         # 개발 중에는 테스트 서버에만 명령어 등록
@@ -48,6 +57,7 @@ class GameDataBot(discord.Client):
 
         print(f"Slash commands registered: {len(synced)}")
 
+        # 개인 DM 알림 Worker
         if os.getenv(
             "DISCORD_NOTIFICATION_WORKER_ENABLED", "0"
         ) == "1":
@@ -58,13 +68,25 @@ class GameDataBot(discord.Client):
             logger.info("Notification worker task created")
         else:
             logger.info("Notification worker disabled")
+
+        # 패치노트 서버 채널 알림 Worker
+        if os.getenv(
+            "DISCORD_PATCH_WORKER_ENABLED", "0"
+        ) == "1":
+            self.patch_notification_task = asyncio.create_task(
+                self.patch_notification_loop(),
+                name="discord-patch-notification-worker",
+            )
+            logger.info("Patch notification worker task created")
+        else:
+            logger.info("Patch notification worker disabled")
+
     async def on_ready(self):
         print(f"Discord Bot connected: {self.user}")
 
     async def notification_loop(self) -> None:
-        """10초마다 Outbox 알림 최대 1건을 처리한다."""
+        """10초마다 개인 DM Outbox 알림 최대 1건을 처리한다."""
 
-        # Discord 연결 준비가 끝날 때까지 대기
         await self.wait_until_ready()
 
         logger.info("Discord notification worker started")
@@ -89,18 +111,58 @@ class GameDataBot(discord.Client):
 
             await asyncio.sleep(10)
 
-    async def close(self) -> None:
-        """Bot 종료 시 백그라운드 Worker도 종료한다."""
+    async def patch_notification_loop(self) -> None:
+        """30초마다 패치노트 Outbox 알림 최대 1건을 처리한다."""
 
-        if self.notification_task is not None:
-            self.notification_task.cancel()
+        await self.wait_until_ready()
 
+        logger.info("Discord patch notification worker started")
+
+        while not self.is_closed():
             try:
-                await self.notification_task
+                result = await dispatch_one_patch_notification(self)
+
+                if result != "empty":
+                    logger.info(
+                        "Patch notification dispatch result: %s",
+                        result,
+                    )
+
+            except asyncio.CancelledError:
+                raise
+
+            except Exception:
+                logger.exception(
+                    "Patch notification worker iteration failed"
+                )
+
+            await asyncio.sleep(30)
+
+    async def close(self) -> None:
+        """Bot 종료 시 개인 DM 및 패치노트 Worker를 모두 정리한다."""
+
+        tasks = [
+            task
+            for task in (
+                self.notification_task,
+                self.patch_notification_task,
+            )
+            if task is not None
+        ]
+
+        # 두 Worker에 종료 신호 전달
+        for task in tasks:
+            task.cancel()
+
+        # Worker 종료 대기
+        for task in tasks:
+            try:
+                await task
             except asyncio.CancelledError:
                 pass
 
         await super().close()
+
 
 bot = GameDataBot()
 
@@ -330,6 +392,7 @@ async def patch_subscribe(
         ephemeral=True,
     )
 
+
 @bot.tree.command(
     name="patch-unsubscribe",
     description="서버의 공용 패치 알림 게임 구독을 해제합니다.",
@@ -443,7 +506,7 @@ async def patch_unsubscribe(
 async def patch_subscriptions(
     interaction: discord.Interaction,
 ):
-    # 1. 서버에서만 실행
+    # 1. 서버 내에서만 실행
     if interaction.guild_id is None:
         await interaction.response.send_message(
             "서버에서만 사용할 수 있는 명령어입니다.",
@@ -530,8 +593,10 @@ async def game(
     try:
         # 기존 동기 DB 함수를 별도 스레드에서 실행
         games = await asyncio.to_thread(get_games)
+
     except Exception:
         logger.exception("Game search DB error")
+
         await interaction.followup.send(
             "게임 데이터를 조회하는 중 오류가 발생했습니다.",
             ephemeral=True,

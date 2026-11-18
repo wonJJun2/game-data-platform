@@ -39,6 +39,8 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
+      DISCORD_NOTIFICATION_WORKER_ENABLED: ${DISCORD_NOTIFICATION_WORKER_ENABLED:-0}
+      DISCORD_PATCH_WORKER_ENABLED: ${DISCORD_PATCH_WORKER_ENABLED:-0}
     depends_on:
       db:
         condition: service_healthy
