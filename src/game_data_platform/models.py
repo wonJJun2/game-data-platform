@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -718,6 +719,82 @@ class DiscordGameSubscription(Base):
             name="uq_discord_game_subscriptions_guild_user_game",
         ),
     )
+
+
+class DiscordPriceSubscription(Base):
+    __tablename__ = "discord_price_subscriptions"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        primary_key=True,
+    )
+
+    discord_user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    game_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("games.game_id"),
+        nullable=False,
+    )
+
+    country_code: Mapped[str] = mapped_column(
+        String(2),
+        nullable=False,
+        server_default="KR",
+    )
+
+    target_price: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2),
+        nullable=False,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+    )
+
+    is_armed: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+    )
+
+    last_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "discord_user_id",
+            "game_id",
+            "country_code",
+            name="uq_discord_price_subscriptions_user_game_country",
+        ),
+        CheckConstraint(
+            "target_price > 0",
+            name="ck_discord_price_subscriptions_target_price_positive",
+        ),
+    )
+
 
 class PatchNotificationOutbox(Base):
     __tablename__ = "patch_notification_outbox"
