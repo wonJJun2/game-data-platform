@@ -68,6 +68,7 @@ def set_price_subscription(
             "target_price": statement.excluded.target_price,
             "is_active": True,
             "is_armed": True,
+            "alert_generation": DiscordPriceSubscription.alert_generation + 1,
             "updated_at": func.now(),
         },
         where=or_(
@@ -97,6 +98,7 @@ def get_price_subscriptions(
             DiscordPriceSubscription.country_code,
             DiscordPriceSubscription.target_price,
             DiscordPriceSubscription.is_armed,
+            DiscordPriceSubscription.alert_generation,
             DiscordPriceSubscription.last_notified_at,
             DiscordPriceSubscription.created_at,
             DiscordPriceSubscription.updated_at,

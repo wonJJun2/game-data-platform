@@ -764,6 +764,12 @@ class DiscordPriceSubscription(Base):
         server_default="true",
     )
 
+    alert_generation: Mapped[int] = mapped_column(
+        BigInteger,
+        server_default="1",
+        nullable=False,
+    )
+
     last_notified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -792,6 +798,10 @@ class DiscordPriceSubscription(Base):
         CheckConstraint(
             "target_price > 0",
             name="ck_discord_price_subscriptions_target_price_positive",
+        ),
+        CheckConstraint(
+            "alert_generation >= 1",
+            name="ck_price_subscription_generation",
         ),
     )
 
@@ -1027,4 +1037,60 @@ class DiscordPatchNotificationOutbox(Base):
             "status",
             "next_attempt_at",
         ),
+    )
+
+
+class DiscordPriceNotificationOutbox(Base):
+    __tablename__ = "discord_price_notification_outbox"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, Identity(), primary_key=True,
+    )
+    subscription_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("discord_price_subscriptions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    alert_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    initial_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    final_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    discount_percent: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    price_checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), server_default="pending", nullable=False,
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False,
+    )
+    delivery_attempt_count: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False,
+    )
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "subscription_id", "alert_generation",
+            name="uq_price_outbox_subscription_generation",
+        ),
+        CheckConstraint("alert_generation >= 1", name="ck_price_outbox_generation"),
+        CheckConstraint("target_price > 0", name="ck_price_outbox_target_positive"),
+        CheckConstraint("final_price >= 0", name="ck_price_outbox_final_nonnegative"),
+        CheckConstraint("final_price <= target_price", name="ck_price_outbox_target_reached"),
+        Index("ix_discord_price_notification_outbox_ready", "status", "next_attempt_at"),
     )
