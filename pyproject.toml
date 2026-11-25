@@ -21,7 +21,6 @@ dependencies = [
 ]
 
 [project.scripts]
-game-data-platform = "game_data_platform:main"
 game-data-news = "game_data_platform.news_pipeline:main"
 game-data-patches = "game_data_platform.patch_pipeline:main"
 game-data-patch-llm = "game_data_platform.patch_llm_processor:main"

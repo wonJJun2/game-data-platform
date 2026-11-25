@@ -1231,12 +1231,6 @@ a.page-link:hover {
     }
 
 
-    .current-player-card {
-        width: 100%;
-
-        text-align: left;
-    }
-
 
     .section-heading {
         align-items: flex-start;
@@ -1248,10 +1242,6 @@ a.page-link:hover {
 
     .dashboard-section {
         padding: 24px 20px;
-    }
-
-    .player-chart-container {
-        height: 260px;
     }
 
 }
@@ -1594,56 +1584,6 @@ a.page-link:hover {
 
 
 /* ========================================
-   Current player count
-======================================== */
-
-.current-player-card {
-    min-width: 210px;
-
-    padding:
-        22px
-        24px;
-
-    background:
-        var(--surface);
-
-    border:
-        1px solid
-        var(--border);
-
-    border-radius:
-        var(--radius);
-
-    text-align: right;
-}
-
-
-.current-player-card span {
-    display: block;
-
-    margin-bottom: 7px;
-
-    font-size: 12px;
-
-    color:
-        var(--text-secondary);
-}
-
-
-.current-player-card strong {
-    display: block;
-
-    font-size: 30px;
-
-    font-weight: 750;
-
-    letter-spacing:
-        -0.04em;
-}
-
-
-
-/* ========================================
    Dashboard sections
 ======================================== */
 
@@ -1729,22 +1669,6 @@ a.page-link:hover {
 .section-link:hover {
     color:
         var(--accent);
-}
-
-
-
-/* ========================================
-   Player chart
-======================================== */
-
-.player-chart-container {
-    position: relative;
-
-    width: 100%;
-
-    height: 340px;
-
-    margin-top: 8px;
 }
 
 
@@ -1928,12 +1852,6 @@ a.page-link:hover {
     }
 
 
-    .current-player-card {
-        width: 100%;
-
-        text-align: left;
-    }
-
 
     .dashboard-section {
         padding:
@@ -1952,10 +1870,6 @@ a.page-link:hover {
     }
 
 
-    .player-chart-container {
-        height: 260px;
-    }
-
 
     .game-card-content {
         padding:
@@ -1964,55 +1878,7 @@ a.page-link:hover {
 
 }
 
-/* ========================================
-   Chart legend
-======================================== */
 
-.chart-legend {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-
-    gap: 18px;
-
-    margin-bottom: 14px;
-
-    font-size: 12px;
-
-    color:
-        var(--text-secondary);
-}
-
-
-.chart-legend-item {
-    display: flex;
-    align-items: center;
-
-    gap: 7px;
-}
-
-
-.chart-line-sample {
-    display: inline-block;
-
-    width: 20px;
-    height: 2px;
-
-    background:
-        var(--accent);
-}
-
-
-.chart-patch-sample {
-    display: inline-block;
-
-    width: 1px;
-    height: 14px;
-
-    border-left:
-        1px dashed
-        var(--accent);
-}
 
 .patch-processing-actions {
     display: flex;

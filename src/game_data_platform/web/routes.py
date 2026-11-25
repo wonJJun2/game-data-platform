@@ -17,8 +17,6 @@ from game_data_platform.storage import (
     get_current_game_price,
     get_game,
     get_games,
-    get_latest_player_count,
-    get_player_counts,
     get_patch_viewer_count,
     get_patch_viewer_detail,
     get_patch_viewer_games,
@@ -69,18 +67,6 @@ def game_list(
     steam_url: str | None = None,
 ):
     games = get_games()
-
-    for game in games:
-        latest_player_count = (
-            get_latest_player_count(
-                game["game_id"]
-            )
-        )
-
-        game["latest_player_count"] = (
-            latest_player_count
-        )
-
 
     registration_preview = None
     registration_error = None
@@ -176,11 +162,6 @@ def game_detail(
             status_code=404,
         )
 
-    latest_player_count = (
-        get_latest_player_count(
-            game_id=game_id,
-        )
-    )
     current_price = get_current_game_price(
         game_id=game_id,
     )
@@ -284,49 +265,6 @@ def game_detail(
                 "가격 정보 없음"
             )
 
-    player_counts = get_player_counts(
-        game_id=game_id,
-        limit=168,
-        order="desc",
-    )
-
-    # 최신 168건을 가져온 뒤
-    # 화면에서는 시간순으로 사용한다.
-    player_counts.reverse()
-
-    for item in player_counts:
-        collected_at_kst = (
-            item["collected_at"]
-            .astimezone(KST)
-        )
-
-        item["display_collected_at"] = (
-            collected_at_kst.strftime(
-                "%m.%d %H:%M"
-            )
-        )
-
-        item["chart_date"] = (
-            collected_at_kst.strftime(
-                "%Y-%m-%d"
-            )
-        )
-
-    player_chart_data = {
-        "labels": [
-            item["display_collected_at"]
-            for item in player_counts
-        ],
-        "dates": [
-            item["chart_date"]
-            for item in player_counts
-        ],
-        "values": [
-            item["player_count"]
-            for item in player_counts
-        ],
-    }
-
     patches = get_patch_viewer_list(
         limit=5,
         offset=0,
@@ -355,44 +293,16 @@ def game_detail(
             )
         )
 
-    patch_markers = [
-        {
-            "date": (
-                patch["source_date"].strftime(
-                    "%Y-%m-%d"
-                )
-                if patch["source_date"]
-                else None
-            ),
-            "title": patch["display_title"],
-            "patch_id": patch["patch_id"],
-        }
-        for patch in patches
-        if patch["source_date"]
-    ]
-
     return templates.TemplateResponse(
         request=request,
         name="game_detail.html",
         context={
             "page_title": game["name"],
             "game": game,
-            "latest_player_count": (
-                latest_player_count
-            ),
             "current_price": price_view,
             "price_history": price_history,
             "price_chart_data": price_chart_data,
-            "player_counts": (
-                player_counts
-            ),
-            "player_chart_data": (
-                player_chart_data
-            ),
             "patches": patches,
-            "patch_markers": (
-                patch_markers
-            ),
         },
     )
 

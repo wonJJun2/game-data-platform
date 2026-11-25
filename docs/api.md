@@ -2,7 +2,7 @@
 
 ## 개요
 
-Game Data Platform에 저장된 게임 정보와 동시 접속자 데이터를 조회하기 위한 REST API 명세입니다.
+Game Data Platform에 저장된 게임 정보를 조회하는 JSON 핸들러의 명세입니다. 전체 FastAPI 앱에서 같은 경로를 요청하면 먼저 등록된 웹 라우터가 HTML을 반환합니다.
 
 ---
 
@@ -81,103 +81,6 @@ GET /games/1
 
 ---
 
-## 3. 게임 동시 접속자 이력 조회
-
-### Request
-
-```http
-GET /games/{game_id}/player-counts
-```
-
-### Path Parameters
-
-* `game_id`: 조회할 게임의 ID
-
-### Query Parameters
-
-* `limit`: 반환할 최대 데이터 개수
-* `order`: 정렬 순서
-
-  * `asc`
-  * `desc`
-
-### Example
-
-```http
-GET /games/1/player-counts?limit=100&order=desc
-```
-
-### Response
-
-**200 OK**
-
-```json
-[
-  {
-    "player_count": 1285034,
-    "collected_at": "2026-09-21T18:00:00"
-  },
-  {
-    "player_count": 1278441,
-    "collected_at": "2026-09-21T17:00:00"
-  }
-]
-```
-
-게임이 존재하지 않을 경우:
-
-**404 Not Found**
-
-```json
-{
-  "detail": "Game not found"
-}
-```
-
----
-
-## 4. 최신 동시 접속자 조회
-
-### Request
-
-```http
-GET /games/{game_id}/player-counts/latest
-```
-
-### Path Parameters
-
-* `game_id`: 조회할 게임의 ID
-
-### Example
-
-```http
-GET /games/1/player-counts/latest
-```
-
-### Response
-
-**200 OK**
-
-```json
-{
-  "game_id": 1,
-  "player_count": 1285034,
-  "collected_at": "2026-09-21T18:00:00"
-}
-```
-
-최신 동시 접속자 데이터가 존재하지 않을 경우:
-
-**404 Not Found**
-
-```json
-{
-  "detail": "Player count not found"
-}
-```
-
----
-
 ## HTTP Status Code
 
 | Status Code | 의미           |
@@ -196,5 +99,3 @@ GET /games/1/player-counts/latest
 | ------ | --------------------------------------- | ---------------- |
 | GET    | `/games`                                | 전체 게임 목록 조회      |
 | GET    | `/games/{game_id}`                      | 특정 게임 조회         |
-| GET    | `/games/{game_id}/player-counts`        | 특정 게임의 동접자 이력 조회 |
-| GET    | `/games/{game_id}/player-counts/latest` | 특정 게임의 최신 동접자 조회 |
