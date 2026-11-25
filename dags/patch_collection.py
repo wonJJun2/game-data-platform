@@ -21,7 +21,7 @@ def check_collection_failures(result: dict) -> None:
 
 @dag(
     dag_id="patch_collection",
-    schedule="30 */6 * * *",
+    schedule="30 7,19 * * *",
     start_date=pendulum.datetime(
         2026,
         1,
@@ -42,7 +42,7 @@ def patch_collection():
     @task(retries=0)
     def collect_patches():
         llm_limit = int(
-            os.getenv("PATCH_LLM_PROCESS_LIMIT", "3")
+            os.getenv("PATCH_LLM_PROCESS_LIMIT", "6")
         )
 
         if llm_limit < 1:
