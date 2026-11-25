@@ -1,7 +1,6 @@
 from math import ceil
 from pathlib import Path
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -21,7 +20,6 @@ from game_data_platform.storage import (
     get_patch_viewer_detail,
     get_patch_viewer_games,
     get_patch_viewer_list,
-    get_game_price_history,
 )
 
 from game_data_platform.services.game_service import (
@@ -46,8 +44,6 @@ from game_data_platform.web.presentation import (
 from game_data_platform.patch_llm_processor import (
     process_patch_by_id,
 )
-
-KST = ZoneInfo("Asia/Seoul")
 
 router = APIRouter()
 
@@ -165,48 +161,6 @@ def game_detail(
     current_price = get_current_game_price(
         game_id=game_id,
     )
-    price_history = get_game_price_history(
-        game_id=game_id,
-        limit=100,
-        order="asc",
-    )
-    price_chart_data = []
-
-    for item in price_history:
-        if (
-            item["price_status"] != "priced"
-            or item["final_price"] is None
-        ):
-            continue
-
-        changed_at = item["changed_at"]
-
-        if changed_at is not None:
-            changed_at = (
-                changed_at
-                .astimezone(KST)
-                .isoformat()
-            )
-
-        price_chart_data.append(
-            {
-                "changed_at": changed_at,
-                "price": float(
-                    item["final_price"]
-                ),
-                "initial_price": (
-                    float(
-                        item["initial_price"]
-                    )
-                    if item["initial_price"]
-                    is not None
-                    else None
-                ),
-                "discount_percent": (
-                    item["discount_percent"]
-                ),
-            }
-        )
     price_view = {
         "status": "not_collected",
         "label": "가격 정보 없음",
@@ -300,8 +254,6 @@ def game_detail(
             "page_title": game["name"],
             "game": game,
             "current_price": price_view,
-            "price_history": price_history,
-            "price_chart_data": price_chart_data,
             "patches": patches,
         },
     )

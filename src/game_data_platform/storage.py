@@ -730,7 +730,6 @@ def save_game_price(
                     "game_id": game_id,
                     "current_id": current_id,
                     "checked_at": checked_at,
-                    "history_id": None,
                     "changed": True,
                     "action": "created",
                 }
@@ -780,7 +779,6 @@ def save_game_price(
                     "game_id": game_id,
                     "current_id": current_id,
                     "checked_at": checked_at,
-                    "history_id": None,
                     "changed": False,
                     "action": "checked",
                 }
@@ -805,7 +803,6 @@ def save_game_price(
         "game_id": game_id,
         "current_id": current_id,
         "checked_at": checked_at,
-        "history_id": None,
         "changed": True,
         "action": "changed",
     }
@@ -863,72 +860,6 @@ def get_current_game_price(
         "checked_at": row[9],
         "changed_at": row[10],
     }
-
-
-def get_game_price_history(
-    game_id: int,
-    provider: str = "steam",
-    country_code: str = "KR",
-    limit: int = 100,
-    order: str = "desc",
-) -> list[dict]:
-    if order not in (
-        "asc",
-        "desc",
-    ):
-        raise ValueError(
-            "order must be 'asc' or 'desc'"
-        )
-
-    query = f"""
-        SELECT
-            game_id,
-            provider,
-            country_code,
-            price_status,
-            is_free,
-            currency,
-            initial_price,
-            final_price,
-            discount_percent,
-            changed_at
-        FROM game_price_history
-        WHERE game_id = %s
-          AND provider = %s
-          AND country_code = %s
-        ORDER BY changed_at {order.upper()}
-        LIMIT %s
-    """
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                query,
-                (
-                    game_id,
-                    provider,
-                    country_code,
-                    limit,
-                ),
-            )
-
-            rows = cur.fetchall()
-
-    return [
-        {
-            "game_id": row[0],
-            "provider": row[1],
-            "country_code": row[2],
-            "price_status": row[3],
-            "is_free": row[4],
-            "currency": row[5],
-            "initial_price": row[6],
-            "final_price": row[7],
-            "discount_percent": row[8],
-            "changed_at": row[9],
-        }
-        for row in rows
-    ]
 
 def get_game_patches_for_processing(
     limit: int = 20,
