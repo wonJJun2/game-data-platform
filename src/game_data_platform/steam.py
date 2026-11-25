@@ -1,34 +1,6 @@
 import httpx
 
 
-def get_current_players(app_id: int) -> int:
-    url = (
-        "https://api.steampowered.com/"
-        "ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
-    )
-    response = httpx.get(
-        url,
-        params={"appid": app_id},
-        timeout=10.0,
-    )
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    player_count = (
-        data.get("response", {})
-        .get("player_count")
-    )
-
-    if player_count is None:
-        raise ValueError(
-            "Steam player count is unavailable "
-            f"for app_id={app_id}"
-        )
-
-    return int(player_count)
-
 def get_news_for_app(
     app_id: int,
     count: int = 20,
