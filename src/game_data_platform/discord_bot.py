@@ -8,14 +8,6 @@ from discord import app_commands
 from dotenv import load_dotenv
 
 from game_data_platform.storage import get_games
-from game_data_platform.discord_subscription_service import (
-    subscribe_game,
-    unsubscribe_game,
-    get_subscribed_games,
-)
-from game_data_platform.discord_notification_dispatcher import (
-    dispatch_one_notification,
-)
 from game_data_platform.discord_patch_notification_dispatcher import (
     dispatch_one_patch_notification,
 )
@@ -48,9 +40,6 @@ class GameDataBot(discord.Client):
 
         self.tree = app_commands.CommandTree(self)
 
-        # 개인 DM 알림 Worker
-        self.notification_task: asyncio.Task | None = None
-
         # 서버 채널 패치노트 알림 Worker
         self.patch_notification_task: asyncio.Task | None = None
 
@@ -67,18 +56,6 @@ class GameDataBot(discord.Client):
         synced = await self.tree.sync(guild=guild)
 
         print(f"Slash commands registered: {len(synced)}")
-
-        # 개인 DM 알림 Worker
-        if os.getenv(
-            "DISCORD_NOTIFICATION_WORKER_ENABLED", "0"
-        ) == "1":
-            self.notification_task = asyncio.create_task(
-                self.notification_loop(),
-                name="discord-notification-worker",
-            )
-            logger.info("Notification worker task created")
-        else:
-            logger.info("Notification worker disabled")
 
         # 패치노트 서버 채널 알림 Worker
         if os.getenv(
@@ -110,33 +87,6 @@ class GameDataBot(discord.Client):
 
     async def on_ready(self):
         print(f"Discord Bot connected: {self.user}")
-
-    async def notification_loop(self) -> None:
-        """10초마다 개인 DM Outbox 알림 최대 1건을 처리한다."""
-
-        await self.wait_until_ready()
-
-        logger.info("Discord notification worker started")
-
-        while not self.is_closed():
-            try:
-                result = await dispatch_one_notification(self)
-
-                if result != "empty":
-                    logger.info(
-                        "Notification dispatch result: %s",
-                        result,
-                    )
-
-            except asyncio.CancelledError:
-                raise
-
-            except Exception:
-                logger.exception(
-                    "Notification worker iteration failed"
-                )
-
-            await asyncio.sleep(10)
 
     async def patch_notification_loop(self) -> None:
         """30초마다 패치노트 Outbox 알림 최대 1건을 처리한다."""
@@ -203,7 +153,6 @@ class GameDataBot(discord.Client):
         tasks = [
             task
             for task in (
-                self.notification_task,
                 self.patch_notification_task,
                 self.price_notification_task,
             )
@@ -230,22 +179,23 @@ bot = GameDataBot()
 
 
 @bot.tree.command(
-    name="ping",
+    name="상태확인",
     description="봇 연결 상태를 확인합니다.",
 )
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "Pong! 🏓",
+        "봇이 정상적으로 연결되어 있습니다.",
         ephemeral=True,
     )
 
 
 @bot.tree.command(
-    name="patch-channel",
+    name="패치채널설정",
     description="서버의 공용 패치 알림 채널을 설정합니다.",
 )
 @app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
+@app_commands.rename(channel="채널")
 @app_commands.describe(
     channel="패치 알림을 받을 텍스트 채널",
 )
@@ -279,7 +229,7 @@ async def patch_channel(
 
     if bot_member is None:
         await interaction.response.send_message(
-            "Bot의 서버 권한 정보를 확인할 수 없습니다.",
+            "봇의 서버 권한 정보를 확인할 수 없습니다.",
             ephemeral=True,
         )
         return
@@ -291,7 +241,7 @@ async def patch_channel(
         and permissions.send_messages
     ):
         await interaction.response.send_message(
-            "선택한 채널에 Bot의 채널 보기 및 "
+            "선택한 채널에 봇의 채널 보기 및 "
             "메시지 전송 권한이 필요합니다.",
             ephemeral=True,
         )
@@ -338,20 +288,21 @@ async def patch_channel(
 
 
 @bot.tree.command(
-    name="patch-subscribe",
+    name="패치구독",
     description="서버의 공용 패치 알림 게임을 구독합니다.",
 )
 @app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
+@app_commands.rename(game="게임")
 @app_commands.describe(game="패치 알림을 구독할 게임")
 @app_commands.choices(
     game=[
         app_commands.Choice(
-            name="Overwatch",
+            name="오버워치",
             value=2357570,
         ),
         app_commands.Choice(
-            name="PUBG: BATTLEGROUNDS",
+            name="배틀그라운드",
             value=578080,
         ),
     ]
@@ -396,7 +347,7 @@ async def patch_subscribe(
         if channel_id is None:
             await interaction.followup.send(
                 "패치 알림 채널이 설정되지 않았습니다. "
-                "먼저 /patch-channel 명령어를 실행해 주세요.",
+                "먼저 /패치채널설정 명령어를 실행해 주세요.",
                 ephemeral=True,
             )
             return
@@ -456,20 +407,21 @@ async def patch_subscribe(
 
 
 @bot.tree.command(
-    name="patch-unsubscribe",
+    name="패치해제",
     description="서버의 공용 패치 알림 게임 구독을 해제합니다.",
 )
 @app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
+@app_commands.rename(game="게임")
 @app_commands.describe(game="구독을 해제할 게임")
 @app_commands.choices(
     game=[
         app_commands.Choice(
-            name="Overwatch",
+            name="오버워치",
             value=2357570,
         ),
         app_commands.Choice(
-            name="PUBG: BATTLEGROUNDS",
+            name="배틀그라운드",
             value=578080,
         ),
     ]
@@ -560,7 +512,7 @@ async def patch_unsubscribe(
 
 
 @bot.tree.command(
-    name="patch-subscriptions",
+    name="패치목록",
     description="서버의 패치 알림 게임 구독 목록을 확인합니다.",
 )
 @app_commands.guild_only()
@@ -638,9 +590,10 @@ async def patch_subscriptions(
 
 
 @bot.tree.command(
-    name="game",
+    name="게임검색",
     description="DB에 등록된 게임을 검색합니다.",
 )
+@app_commands.rename(name="게임명")
 @app_commands.describe(name="검색할 게임 이름")
 async def game(
     interaction: discord.Interaction,
@@ -691,7 +644,7 @@ async def game(
     lines = [
         (
             f"🎮 **{discord.utils.escape_markdown(item['name'])}**\n"
-            f"Steam App ID: `{item['steam_app_id']}`"
+            f"Steam 앱 ID: `{item['steam_app_id']}`"
         )
         for item in matches[:5]
     ]
@@ -700,287 +653,6 @@ async def game(
         "**게임 검색 결과**\n\n" + "\n\n".join(lines),
         ephemeral=True,
     )
-
-
-@bot.tree.command(
-    name="subscribe",
-    description="관심 게임의 패치 알림을 구독합니다.",
-)
-@app_commands.describe(game="구독할 게임 이름")
-async def subscribe(
-    interaction: discord.Interaction,
-    game: str,
-):
-    await interaction.response.defer(
-        ephemeral=True,
-        thinking=True,
-    )
-
-    # 서버별 구독을 관리하므로 서버 ID가 필요
-    if interaction.guild_id is None:
-        await interaction.followup.send(
-            "서버에서만 사용할 수 있는 명령어입니다.",
-            ephemeral=True,
-        )
-        return
-
-    try:
-        games = await asyncio.to_thread(get_games)
-
-        keyword = game.strip().casefold()
-
-        if not keyword:
-            await interaction.followup.send(
-                "구독할 게임 이름을 입력해 주세요.",
-                ephemeral=True,
-            )
-            return
-
-        matches = [
-            item
-            for item in games
-            if keyword in item["name"].casefold()
-        ]
-
-        # 이름이 정확히 일치하는 게임 우선
-        exact_match = next(
-            (
-                item
-                for item in matches
-                if item["name"].casefold() == keyword
-            ),
-            None,
-        )
-
-        if exact_match is not None:
-            selected = exact_match
-        elif len(matches) == 1:
-            selected = matches[0]
-        elif not matches:
-            await interaction.followup.send(
-                "해당 게임을 찾지 못했습니다. "
-                "/game 명령어로 먼저 검색해 주세요.",
-                ephemeral=True,
-            )
-            return
-        else:
-            await interaction.followup.send(
-                "검색된 게임이 여러 개입니다. "
-                "/game으로 확인한 후 정확한 이름을 입력해 주세요.",
-                ephemeral=True,
-            )
-            return
-
-        created = await asyncio.to_thread(
-            subscribe_game,
-            interaction.guild_id,
-            interaction.user.id,
-            selected["game_id"],
-        )
-
-        safe_name = discord.utils.escape_mentions(
-            discord.utils.escape_markdown(selected["name"])
-        )
-
-        if created:
-            message = f"✅ **{safe_name}** 구독이 등록되었습니다."
-        else:
-            message = f"ℹ️ **{safe_name}**은(는) 이미 구독 중입니다."
-
-        await interaction.followup.send(
-            message,
-            ephemeral=True,
-        )
-
-    except Exception:
-        logger.exception("Discord game subscription error")
-
-        await interaction.followup.send(
-            "게임 구독 처리 중 오류가 발생했습니다.",
-            ephemeral=True,
-        )
-
-
-@bot.tree.command(
-    name="subscriptions",
-    description="내가 구독한 게임 목록을 확인합니다.",
-)
-async def subscriptions(
-    interaction: discord.Interaction,
-):
-    await interaction.response.defer(
-        ephemeral=True,
-        thinking=True,
-    )
-
-    if interaction.guild_id is None:
-        await interaction.followup.send(
-            "서버에서만 사용할 수 있는 명령어입니다.",
-            ephemeral=True,
-        )
-        return
-
-    try:
-        games = await asyncio.to_thread(
-            get_subscribed_games,
-            interaction.guild_id,
-            interaction.user.id,
-        )
-
-        if not games:
-            await interaction.followup.send(
-                "아직 구독한 게임이 없습니다.\n"
-                "/subscribe 명령어로 게임을 구독해 보세요.",
-                ephemeral=True,
-            )
-            return
-
-        lines = []
-
-        for game in games[:10]:
-            safe_name = discord.utils.escape_mentions(
-                discord.utils.escape_markdown(
-                    game["name"][:100]
-                )
-            )
-
-            lines.append(
-                f"🎮 **{safe_name}**\n"
-                f"Steam App ID: `{game['steam_app_id']}`"
-            )
-
-        message = (
-            f"**내 구독 게임 ({len(games)}개)**\n\n"
-            + "\n\n".join(lines)
-        )
-
-        if len(games) > 10:
-            message += "\n\n상위 10개 게임만 표시합니다."
-
-        await interaction.followup.send(
-            message,
-            ephemeral=True,
-        )
-
-    except Exception:
-        logger.exception(
-            "Discord subscriptions lookup error"
-        )
-
-        await interaction.followup.send(
-            "구독 목록 조회 중 오류가 발생했습니다.",
-            ephemeral=True,
-        )
-
-
-@bot.tree.command(
-    name="unsubscribe",
-    description="관심 게임의 패치 알림 구독을 해제합니다.",
-)
-@app_commands.describe(game="구독 해제할 게임 이름")
-async def unsubscribe(
-    interaction: discord.Interaction,
-    game: str,
-):
-    await interaction.response.defer(
-        ephemeral=True,
-        thinking=True,
-    )
-
-    if interaction.guild_id is None:
-        await interaction.followup.send(
-            "서버에서만 사용할 수 있는 명령어입니다.",
-            ephemeral=True,
-        )
-        return
-
-    try:
-        # 현재 사용자가 구독한 게임만 조회
-        games = await asyncio.to_thread(
-            get_subscribed_games,
-            interaction.guild_id,
-            interaction.user.id,
-        )
-
-        keyword = game.strip().casefold()
-
-        if not keyword:
-            await interaction.followup.send(
-                "구독 해제할 게임 이름을 입력해 주세요.",
-                ephemeral=True,
-            )
-            return
-
-        matches = [
-            item
-            for item in games
-            if keyword in item["name"].casefold()
-        ]
-
-        exact_match = next(
-            (
-                item
-                for item in matches
-                if item["name"].casefold() == keyword
-            ),
-            None,
-        )
-
-        if exact_match is not None:
-            selected = exact_match
-        elif len(matches) == 1:
-            selected = matches[0]
-        elif not matches:
-            await interaction.followup.send(
-                "해당 게임을 구독하고 있지 않습니다.",
-                ephemeral=True,
-            )
-            return
-        else:
-            await interaction.followup.send(
-                "일치하는 구독 게임이 여러 개입니다. "
-                "정확한 게임 이름을 입력해 주세요.",
-                ephemeral=True,
-            )
-            return
-
-        removed = await asyncio.to_thread(
-            unsubscribe_game,
-            interaction.guild_id,
-            interaction.user.id,
-            selected["game_id"],
-        )
-
-        safe_name = discord.utils.escape_mentions(
-            discord.utils.escape_markdown(
-                selected["name"]
-            )
-        )
-
-        if removed:
-            message = (
-                f"✅ **{safe_name}** 구독이 해제되었습니다."
-            )
-        else:
-            message = (
-                f"ℹ️ **{safe_name}**은(는) "
-                "이미 구독이 해제된 상태입니다."
-            )
-
-        await interaction.followup.send(
-            message,
-            ephemeral=True,
-        )
-
-    except Exception:
-        logger.exception(
-            "Discord game unsubscribe error"
-        )
-
-        await interaction.followup.send(
-            "게임 구독 해제 중 오류가 발생했습니다.",
-            ephemeral=True,
-        )
 
 
 def _find_price_game(
@@ -1028,6 +700,7 @@ def _safe_price_game_name(name: str) -> str:
     name="가격설정",
     description="Steam 게임의 목표 가격을 설정하거나 변경합니다.",
 )
+@app_commands.rename(game="게임", target_price="목표가격")
 @app_commands.describe(
     game="Steam 게임 이름 (전체 또는 일부)",
     target_price="목표 가격 (원, 양의 정수)",
@@ -1063,7 +736,7 @@ async def price_set(
 
         if error == "not_found":
             await interaction.followup.send(
-                "게임을 찾지 못했습니다. /game 명령어로 검색해 주세요.",
+                "게임을 찾지 못했습니다. /게임검색 명령어로 검색해 주세요.",
                 ephemeral=True,
             )
             return
@@ -1164,6 +837,7 @@ async def price_list(interaction: discord.Interaction):
     name="가격해제",
     description="Steam 목표 가격 알림 구독을 해제합니다.",
 )
+@app_commands.rename(game="게임")
 @app_commands.describe(game="구독을 해제할 Steam 게임 이름")
 async def price_remove(
     interaction: discord.Interaction,
