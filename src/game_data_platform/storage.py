@@ -739,7 +739,7 @@ def save_game_price(
             %s, %s, %s, %s,
             NOW(), NOW()
         )
-        RETURNING id
+        RETURNING id, checked_at
     """
 
     update_current_query = """
@@ -754,33 +754,14 @@ def save_game_price(
             checked_at = NOW(),
             changed_at = NOW()
         WHERE id = %s
+        RETURNING checked_at
     """
 
     touch_current_query = """
         UPDATE game_price_current
         SET checked_at = NOW()
         WHERE id = %s
-    """
-
-    insert_history_query = """
-        INSERT INTO game_price_history (
-            game_id,
-            provider,
-            country_code,
-            price_status,
-            is_free,
-            currency,
-            initial_price,
-            final_price,
-            discount_percent,
-            changed_at
-        )
-        VALUES (
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s,
-            NOW()
-        )
-        RETURNING id
+        RETURNING checked_at
     """
 
     with get_connection() as conn:
@@ -827,31 +808,15 @@ def save_game_price(
                     ),
                 )
 
-                current_id = cur.fetchone()[0]
-
-                cur.execute(
-                    insert_history_query,
-                    (
-                        game_id,
-                        data["provider"],
-                        data["country_code"],
-                        data["price_status"],
-                        data["is_free"],
-                        data["currency"],
-                        data["initial_price"],
-                        data["final_price"],
-                        data["discount_percent"],
-                    ),
-                )
-
-                history_id = cur.fetchone()[0]
+                current_id, checked_at = cur.fetchone()
 
                 conn.commit()
 
                 return {
                     "game_id": game_id,
                     "current_id": current_id,
-                    "history_id": history_id,
+                    "checked_at": checked_at,
+                    "history_id": None,
                     "changed": True,
                     "action": "created",
                 }
@@ -893,12 +858,14 @@ def save_game_price(
                     touch_current_query,
                     (current_id,),
                 )
+                checked_at = cur.fetchone()[0]
 
                 conn.commit()
 
                 return {
                     "game_id": game_id,
                     "current_id": current_id,
+                    "checked_at": checked_at,
                     "history_id": None,
                     "changed": False,
                     "action": "checked",
@@ -916,30 +883,15 @@ def save_game_price(
                     current_id,
                 ),
             )
-
-            cur.execute(
-                insert_history_query,
-                (
-                    game_id,
-                    data["provider"],
-                    data["country_code"],
-                    data["price_status"],
-                    data["is_free"],
-                    data["currency"],
-                    data["initial_price"],
-                    data["final_price"],
-                    data["discount_percent"],
-                ),
-            )
-
-            history_id = cur.fetchone()[0]
+            checked_at = cur.fetchone()[0]
 
         conn.commit()
 
     return {
         "game_id": game_id,
         "current_id": current_id,
-        "history_id": history_id,
+        "checked_at": checked_at,
+        "history_id": None,
         "changed": True,
         "action": "changed",
     }

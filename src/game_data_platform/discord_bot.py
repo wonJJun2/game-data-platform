@@ -19,12 +19,20 @@ from game_data_platform.discord_notification_dispatcher import (
 from game_data_platform.discord_patch_notification_dispatcher import (
     dispatch_one_patch_notification,
 )
+from game_data_platform.discord_price_notification_dispatcher import (
+    dispatch_one_price_notification,
+)
 from game_data_platform.discord_patch_subscription_service import (
     set_patch_channel,
     get_patch_channel,
     subscribe_patch_game,
     unsubscribe_patch_game,
     get_subscribed_patch_games,
+)
+from game_data_platform.discord_price_subscription_service import (
+    set_price_subscription,
+    get_price_subscriptions,
+    remove_price_subscription,
 )
 
 load_dotenv()
@@ -45,6 +53,9 @@ class GameDataBot(discord.Client):
 
         # 서버 채널 패치노트 알림 Worker
         self.patch_notification_task: asyncio.Task | None = None
+
+        # Steam 목표 가격 개인 DM 알림 Worker
+        self.price_notification_task: asyncio.Task | None = None
 
     async def setup_hook(self):
         # 개발 중에는 테스트 서버에만 명령어 등록
@@ -80,6 +91,22 @@ class GameDataBot(discord.Client):
             logger.info("Patch notification worker task created")
         else:
             logger.info("Patch notification worker disabled")
+
+        # Steam 목표 가격 개인 DM 알림 Worker
+        if os.getenv(
+            "DISCORD_PRICE_WORKER_ENABLED", "0"
+        ) == "1":
+            if (
+                self.price_notification_task is None
+                or self.price_notification_task.done()
+            ):
+                self.price_notification_task = asyncio.create_task(
+                    self.price_notification_loop(),
+                    name="discord-price-notification-worker",
+                )
+                logger.info("Price notification worker task created")
+        else:
+            logger.info("Price notification worker disabled")
 
     async def on_ready(self):
         print(f"Discord Bot connected: {self.user}")
@@ -138,19 +165,52 @@ class GameDataBot(discord.Client):
 
             await asyncio.sleep(30)
 
+    async def price_notification_loop(self) -> None:
+        """가격 알림 최대 1건을 처리하고 10초간 대기한다."""
+
+        await self.wait_until_ready()
+
+        logger.info("Discord price notification worker started")
+
+        while not self.is_closed():
+            try:
+                # Gateway 재연결 중에는 새로운 발송 작업을 선점하지 않는다.
+                await self.wait_until_ready()
+                if self.is_closed():
+                    break
+
+                result = await dispatch_one_price_notification(self)
+
+                if result != "empty":
+                    logger.info(
+                        "Price notification dispatch result: %s",
+                        result,
+                    )
+
+            except asyncio.CancelledError:
+                raise
+
+            except Exception:
+                logger.exception(
+                    "Price notification worker iteration failed"
+                )
+
+            await asyncio.sleep(10)
+
     async def close(self) -> None:
-        """Bot 종료 시 개인 DM 및 패치노트 Worker를 모두 정리한다."""
+        """Bot 종료 시 모든 알림 Worker를 정리한다."""
 
         tasks = [
             task
             for task in (
                 self.notification_task,
                 self.patch_notification_task,
+                self.price_notification_task,
             )
             if task is not None
         ]
 
-        # 두 Worker에 종료 신호 전달
+        # 모든 Worker에 종료 신호 전달
         for task in tasks:
             task.cancel()
 
@@ -160,6 +220,8 @@ class GameDataBot(discord.Client):
                 await task
             except asyncio.CancelledError:
                 pass
+            except Exception:
+                logger.exception("Notification worker shutdown failed")
 
         await super().close()
 
@@ -919,6 +981,256 @@ async def unsubscribe(
             "게임 구독 해제 중 오류가 발생했습니다.",
             ephemeral=True,
         )
+
+
+def _find_price_game(
+    games: list[dict],
+    query: str,
+    name_field: str,
+) -> tuple[dict | None, str | None]:
+    """Resolve an exact or unambiguous partial game name."""
+    keyword = query.strip().casefold()
+    if not keyword:
+        return None, "empty"
+
+    matches = [
+        item
+        for item in games
+        if keyword in item[name_field].casefold()
+    ]
+
+    exact = next(
+        (
+            item
+            for item in matches
+            if item[name_field].casefold() == keyword
+        ),
+        None,
+    )
+
+    if exact is not None:
+        return exact, None
+    if len(matches) == 1:
+        return matches[0], None
+    if not matches:
+        return None, "not_found"
+    return None, "ambiguous"
+
+
+def _safe_price_game_name(name: str) -> str:
+    """Escape Markdown and mentions in names returned from the DB."""
+    return discord.utils.escape_mentions(
+        discord.utils.escape_markdown(name[:90])
+    )
+
+
+@bot.tree.command(
+    name="가격설정",
+    description="Steam 게임의 목표 가격을 설정하거나 변경합니다.",
+)
+@app_commands.describe(
+    game="Steam 게임 이름 (전체 또는 일부)",
+    target_price="목표 가격 (원, 양의 정수)",
+)
+async def price_set(
+    interaction: discord.Interaction,
+    game: str,
+    target_price: int,
+):
+    # Discord 명령어 입력값을 DB 작업 전에 검증
+    if not 1 <= target_price <= 999_999_999_999:
+        await interaction.response.send_message(
+            "목표 가격은 1원 이상의 정수로 입력해 주세요.",
+            ephemeral=True,
+        )
+        return
+
+    if not game.strip():
+        await interaction.response.send_message(
+            "게임 이름을 입력해 주세요.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        games = await asyncio.to_thread(get_games)
+        selected, error = _find_price_game(games, game, "name")
+
+        if error == "not_found":
+            await interaction.followup.send(
+                "게임을 찾지 못했습니다. /game 명령어로 검색해 주세요.",
+                ephemeral=True,
+            )
+            return
+        if error == "ambiguous":
+            await interaction.followup.send(
+                "검색된 게임이 여러 개입니다. 정확한 이름을 입력해 주세요.",
+                ephemeral=True,
+            )
+            return
+        if error == "empty":
+            await interaction.followup.send(
+                "게임 이름을 입력해 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        changed = await asyncio.to_thread(
+            set_price_subscription,
+            interaction.user.id,
+            selected["game_id"],
+            target_price,
+        )
+
+    except Exception:
+        logger.exception("Discord price subscription setting error")
+        await interaction.followup.send(
+            "목표 가격을 저장하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    safe_name = _safe_price_game_name(selected["name"])
+    if changed:
+        message = (
+            f"✅ **{safe_name}** 목표 가격을 "
+            f"**{target_price:,}원**으로 설정했습니다.\n"
+            "한국 Steam 스토어 가격을 기준으로 확인합니다."
+        )
+    else:
+        message = (
+            f"ℹ️ **{safe_name}**의 목표 가격은 이미 "
+            f"**{target_price:,}원**으로 설정되어 있습니다."
+        )
+
+    await interaction.followup.send(message, ephemeral=True)
+
+
+@bot.tree.command(
+    name="가격목록",
+    description="내 Steam 목표 가격 알림 구독 목록을 조회합니다.",
+)
+async def price_list(interaction: discord.Interaction):
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        subscriptions = await asyncio.to_thread(
+            get_price_subscriptions,
+            interaction.user.id,
+        )
+    except Exception:
+        logger.exception("Discord price subscriptions lookup error")
+        await interaction.followup.send(
+            "목표 가격 목록을 조회하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    if not subscriptions:
+        await interaction.followup.send(
+            "등록된 목표 가격이 없습니다. /가격설정으로 추가해 주세요.",
+            ephemeral=True,
+        )
+        return
+
+    lines = []
+    for subscription in subscriptions[:10]:
+        safe_name = _safe_price_game_name(subscription["game_name"])
+        target_price = int(subscription["target_price"])
+        lines.append(
+            f"🎮 **{safe_name}** (`{subscription['steam_app_id']}`)\n"
+            f"목표 가격: **{target_price:,}원**"
+        )
+
+    message = (
+        f"**내 목표 가격 알림 ({len(subscriptions)}개)**\n\n"
+        + "\n\n".join(lines)
+    )
+    if len(subscriptions) > 10:
+        message += "\n\n상위 10개 게임만 표시합니다."
+
+    await interaction.followup.send(message, ephemeral=True)
+
+
+@bot.tree.command(
+    name="가격해제",
+    description="Steam 목표 가격 알림 구독을 해제합니다.",
+)
+@app_commands.describe(game="구독을 해제할 Steam 게임 이름")
+async def price_remove(
+    interaction: discord.Interaction,
+    game: str,
+):
+    if not game.strip():
+        await interaction.response.send_message(
+            "해제할 게임 이름을 입력해 주세요.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(
+        ephemeral=True,
+        thinking=True,
+    )
+
+    try:
+        subscriptions = await asyncio.to_thread(
+            get_price_subscriptions,
+            interaction.user.id,
+        )
+        selected, error = _find_price_game(
+            subscriptions,
+            game,
+            "game_name",
+        )
+
+        if error == "not_found":
+            await interaction.followup.send(
+                "해당 게임의 목표 가격 알림을 구독하고 있지 않습니다.",
+                ephemeral=True,
+            )
+            return
+        if error == "ambiguous":
+            await interaction.followup.send(
+                "일치하는 구독 게임이 여러 개입니다. 정확한 이름을 입력해 주세요.",
+                ephemeral=True,
+            )
+            return
+        if error == "empty":
+            await interaction.followup.send(
+                "해제할 게임 이름을 입력해 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        removed = await asyncio.to_thread(
+            remove_price_subscription,
+            interaction.user.id,
+            selected["game_id"],
+        )
+    except Exception:
+        logger.exception("Discord price subscription removal error")
+        await interaction.followup.send(
+            "목표 가격을 해제하는 중 오류가 발생했습니다.",
+            ephemeral=True,
+        )
+        return
+
+    safe_name = _safe_price_game_name(selected["game_name"])
+    if removed:
+        message = f"✅ **{safe_name}** 목표 가격 알림을 해제했습니다."
+    else:
+        message = f"ℹ️ **{safe_name}**은(는) 이미 해제된 상태입니다."
+
+    await interaction.followup.send(message, ephemeral=True)
 
 
 def main():
