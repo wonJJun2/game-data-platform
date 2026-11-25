@@ -2,7 +2,7 @@
 
 ## 개요
 
-Game Data Platform에 저장된 게임 정보를 조회하는 JSON 핸들러의 명세입니다. 전체 FastAPI 앱에서 같은 경로를 요청하면 먼저 등록된 웹 라우터가 HTML을 반환합니다.
+Game Data Platform에 저장된 게임 정보를 조회하는 JSON 핸들러의 응답 구조입니다. 전체 FastAPI 앱에서 같은 경로를 요청하면 먼저 등록된 웹 라우터가 HTML을 반환합니다.
 
 ---
 
@@ -25,14 +25,11 @@ GET /games
 ```json
 [
   {
-    "id": 1,
+    "game_id": 1,
     "steam_app_id": 730,
-    "name": "Counter-Strike 2"
-  },
-  {
-    "id": 2,
-    "steam_app_id": 570,
-    "name": "Dota 2"
+    "name": "Counter-Strike 2",
+    "created_at": "2026-09-25T03:00:00Z",
+    "header_image_url": null
   }
 ]
 ```
@@ -63,9 +60,11 @@ GET /games/1
 
 ```json
 {
-  "id": 1,
+  "game_id": 1,
   "steam_app_id": 730,
-  "name": "Counter-Strike 2"
+  "name": "Counter-Strike 2",
+  "created_at": "2026-09-25T03:00:00Z",
+  "header_image_url": null
 }
 ```
 
@@ -86,10 +85,8 @@ GET /games/1
 | Status Code | 의미           |
 | ----------- | ------------ |
 | 200         | 조회 성공        |
-| 201         | 리소스 생성 성공    |
-| 400         | 잘못된 요청       |
 | 404         | 리소스를 찾을 수 없음 |
-| 500         | 서버 내부 오류     |
+| 422         | 경로 매개변수 검증 실패 |
 
 ---
 

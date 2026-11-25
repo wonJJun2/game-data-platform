@@ -9,25 +9,10 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
 
-  patch-init:
-    profiles: ["manual"]
-    build: .
-    container_name: game-data-patch-init
-    env_file:
-      - .env
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-    depends_on:
-      db:
-        condition: service_healthy
-    command: uv run --no-dev game-data-patches
-    restart: "no"
 
   discord-bot:
     build:
@@ -47,19 +32,6 @@ services:
     command: uv run --no-dev game-data-discord
     restart: unless-stopped
 
-  price-init:
-    build: .
-    container_name: game-data-price-init
-    env_file:
-      - .env
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-    depends_on:
-      db:
-        condition: service_healthy
-    command: uv run --no-dev game-data-price
-    restart: "no"
 
   db:
     image: postgres:17
@@ -82,13 +54,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    
-  redis:
-    image: redis:7-alpine
-    container_name: game-data-redis
-    ports:
-      - "6379:6379"
-
   airflow-db:
     image: postgres:16-alpine
     environment:
