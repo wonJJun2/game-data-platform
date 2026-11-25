@@ -57,36 +57,6 @@ class Game(Base):
     nullable=True,
     )
 
-class PlayerCount(Base):
-    __tablename__ = "player_counts"
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-    )
-
-    game_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("games.game_id"),
-        nullable=False,
-    )
-
-    player_count: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
-
-    collected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
-
-Index(
-    "idx_player_counts_game_collected_at",
-    PlayerCount.game_id,
-    PlayerCount.collected_at.desc(),
-)
-
 class GamePriceCurrent(Base):
     __tablename__ = "game_price_current"
 
@@ -163,72 +133,6 @@ class GamePriceCurrent(Base):
         ),
     )
 
-
-class GamePriceHistory(Base):
-    __tablename__ = "game_price_history"
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-    )
-
-    game_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("games.game_id"),
-        nullable=False,
-    )
-
-    provider: Mapped[str] = mapped_column(
-        String(30),
-        nullable=False,
-    )
-
-    country_code: Mapped[str] = mapped_column(
-        String(2),
-        nullable=False,
-    )
-
-    price_status: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-    )
-
-    is_free: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-    )
-
-    currency: Mapped[str | None] = mapped_column(
-        String(3),
-        nullable=True,
-    )
-
-    initial_price: Mapped[Decimal | None] = mapped_column(
-        Numeric(14, 2),
-        nullable=True,
-    )
-
-    final_price: Mapped[Decimal | None] = mapped_column(
-        Numeric(14, 2),
-        nullable=True,
-    )
-
-    discount_percent: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
-
-    changed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
-
-
-Index(
-    "idx_game_price_history_game_changed_at",
-    GamePriceHistory.game_id,
-    GamePriceHistory.changed_at.desc(),
-)
 
 class SteamNews(Base):
     __tablename__ = "steam_news"
@@ -680,47 +584,6 @@ class GamePatchProcessing(Base):
         ),
     )
 
-class DiscordGameSubscription(Base):
-    __tablename__ = "discord_game_subscriptions"
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        Identity(),
-        primary_key=True,
-    )
-
-    guild_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-    )
-
-    discord_user_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-    )
-
-    game_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("games.game_id"),
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "guild_id",
-            "discord_user_id",
-            "game_id",
-            name="uq_discord_game_subscriptions_guild_user_game",
-        ),
-    )
-
-
 class DiscordPriceSubscription(Base):
     __tablename__ = "discord_price_subscriptions"
 
@@ -802,85 +665,6 @@ class DiscordPriceSubscription(Base):
         CheckConstraint(
             "alert_generation >= 1",
             name="ck_price_subscription_generation",
-        ),
-    )
-
-
-class PatchNotificationOutbox(Base):
-    __tablename__ = "patch_notification_outbox"
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        Identity(),
-        primary_key=True,
-    )
-
-    patch_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("game_patches.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    guild_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-    )
-
-    discord_user_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-    )
-
-    status: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        server_default="pending",
-    )
-
-    attempt_count: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        server_default="0",
-    )
-
-    delivery_attempt_count: Mapped[int] = mapped_column(
-        Integer,
-        server_default="0",
-        nullable=False,
-    )
-
-    next_attempt_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    last_error: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "patch_id",
-            "guild_id",
-            "discord_user_id",
-            name="uq_patch_notification_outbox_delivery",
-        ),
-        Index(
-            "idx_patch_notification_outbox_status_created",
-            "status",
-            "created_at",
         ),
     )
 
