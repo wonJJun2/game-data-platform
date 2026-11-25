@@ -19,6 +19,9 @@ from game_data_platform.discord_notification_dispatcher import (
 from game_data_platform.discord_patch_notification_dispatcher import (
     dispatch_one_patch_notification,
 )
+from game_data_platform.discord_price_notification_dispatcher import (
+    dispatch_one_price_notification,
+)
 from game_data_platform.discord_patch_subscription_service import (
     set_patch_channel,
     get_patch_channel,
@@ -50,6 +53,9 @@ class GameDataBot(discord.Client):
 
         # 서버 채널 패치노트 알림 Worker
         self.patch_notification_task: asyncio.Task | None = None
+
+        # Steam 목표 가격 개인 DM 알림 Worker
+        self.price_notification_task: asyncio.Task | None = None
 
     async def setup_hook(self):
         # 개발 중에는 테스트 서버에만 명령어 등록
@@ -85,6 +91,22 @@ class GameDataBot(discord.Client):
             logger.info("Patch notification worker task created")
         else:
             logger.info("Patch notification worker disabled")
+
+        # Steam 목표 가격 개인 DM 알림 Worker
+        if os.getenv(
+            "DISCORD_PRICE_WORKER_ENABLED", "0"
+        ) == "1":
+            if (
+                self.price_notification_task is None
+                or self.price_notification_task.done()
+            ):
+                self.price_notification_task = asyncio.create_task(
+                    self.price_notification_loop(),
+                    name="discord-price-notification-worker",
+                )
+                logger.info("Price notification worker task created")
+        else:
+            logger.info("Price notification worker disabled")
 
     async def on_ready(self):
         print(f"Discord Bot connected: {self.user}")
@@ -143,19 +165,52 @@ class GameDataBot(discord.Client):
 
             await asyncio.sleep(30)
 
+    async def price_notification_loop(self) -> None:
+        """가격 알림 최대 1건을 처리하고 10초간 대기한다."""
+
+        await self.wait_until_ready()
+
+        logger.info("Discord price notification worker started")
+
+        while not self.is_closed():
+            try:
+                # Gateway 재연결 중에는 새로운 발송 작업을 선점하지 않는다.
+                await self.wait_until_ready()
+                if self.is_closed():
+                    break
+
+                result = await dispatch_one_price_notification(self)
+
+                if result != "empty":
+                    logger.info(
+                        "Price notification dispatch result: %s",
+                        result,
+                    )
+
+            except asyncio.CancelledError:
+                raise
+
+            except Exception:
+                logger.exception(
+                    "Price notification worker iteration failed"
+                )
+
+            await asyncio.sleep(10)
+
     async def close(self) -> None:
-        """Bot 종료 시 개인 DM 및 패치노트 Worker를 모두 정리한다."""
+        """Bot 종료 시 모든 알림 Worker를 정리한다."""
 
         tasks = [
             task
             for task in (
                 self.notification_task,
                 self.patch_notification_task,
+                self.price_notification_task,
             )
             if task is not None
         ]
 
-        # 두 Worker에 종료 신호 전달
+        # 모든 Worker에 종료 신호 전달
         for task in tasks:
             task.cancel()
 
@@ -165,6 +220,8 @@ class GameDataBot(discord.Client):
                 await task
             except asyncio.CancelledError:
                 pass
+            except Exception:
+                logger.exception("Notification worker shutdown failed")
 
         await super().close()
 
